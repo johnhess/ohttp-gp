@@ -29,8 +29,6 @@ include_directories(${boringssl_SOURCE_DIR}/include)
 # Add the main library (ohttp)
 add_library(ohttp ohttp.cc)
 
-# Link BoringSSL to the main library
-target_link_libraries(ohttp)
 # And make BoringSSL/include available when this is depended on
 target_include_directories(ohttp PUBLIC ${boringssl_SOURCE_DIR}/include)
 
@@ -39,6 +37,7 @@ add_executable(ohttp_test ohttp_test.cc)
 
 # Link Google Test and the main library (ohttp) to the test executable
 target_link_libraries(ohttp_test PRIVATE gtest gtest_main ohttp crypto)
+target_include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Enable testing
 enable_testing()
