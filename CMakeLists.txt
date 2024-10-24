@@ -28,9 +28,8 @@ include_directories(${boringssl_SOURCE_DIR}/include)
 
 # Add the main library (ohttp)
 add_library(ohttp ohttp.cc)
-
-# And make BoringSSL/include available when this is depended on
-target_include_directories(ohttp PUBLIC ${boringssl_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ohttp PUBLIC crypto)
+target_include_directories(ohttp PUBLIC ${boringssl_SOURCE_DIR}/include)
 
 # Add the test executable
 add_executable(ohttp_test ohttp_test.cc)
