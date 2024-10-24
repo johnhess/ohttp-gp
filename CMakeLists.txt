@@ -37,6 +37,7 @@ add_executable(ohttp_test ohttp_test.cc)
 
 # Link Google Test and the main library (ohttp) to the test executable
 target_link_libraries(ohttp_test PRIVATE gtest gtest_main ohttp crypto)
+target_include_directories(ohttp PUBLIC ${boringssl_SOURCE_DIR}/include)
 
 # Enable testing
 enable_testing()
