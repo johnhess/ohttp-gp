@@ -11,6 +11,55 @@ namespace ohttp {
         return "foo";
     }
 
+    // Generates a config for a single keypair.
+    std::vector<uint8_t> generate_key_config(EVP_HPKE_KEY *keypair) {
+        // HPKE Symmetric Algorithms {
+        //   HPKE KDF ID (16),
+        //   HPKE AEAD ID (16),
+        // }
+
+        // Key Config {
+        //   Key Identifier (8),
+        //   HPKE KEM ID (16),
+        //   HPKE Public Key (Npk * 8),
+        //   HPKE Symmetric Algorithms Length (16) = 4..65532,
+        //   HPKE Symmetric Algorithms (32) ...,
+        // }
+        
+        std::vector<uint8_t> config;
+
+        // Key Identifier is always 0
+        config.push_back(0);
+
+        // KEM_ID
+        const EVP_HPKE_KEM *kem = EVP_HPKE_KEY_kem(keypair);
+        const uint16_t kem_id = EVP_HPKE_KEM_id(kem);
+        const uint8_t high_byte = (kem_id >> 8) & 0xFF;
+        const uint8_t low_byte = kem_id & 0xFF;
+        config.push_back(high_byte);
+        config.push_back(low_byte);
+
+        // HPKE Public Key
+        uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+        size_t public_key_len;
+        if (!EVP_HPKE_KEY_public_key(keypair, public_key, &public_key_len, sizeof(public_key))) {
+            throw std::runtime_error("Failed to get public key");
+        }
+        config.insert(config.end(), public_key, public_key + public_key_len);
+
+        // Symmetric Algorithms Length
+        config.push_back(0);
+        config.push_back(4);
+
+        // Hardcoded KDF and AEAD IDs
+        config.push_back(0x00);
+        config.push_back(0x01);
+        config.push_back(0x00);
+        config.push_back(0x01);
+
+        return config;
+    }
+
     // Helper to encode a string as a binary vector (length-prefixed)
     std::vector<uint8_t> encode_string(const std::string& str) {
         std::vector<uint8_t> result;
@@ -76,11 +125,6 @@ namespace ohttp {
         // Method Length & Method
         std::string method_value = "POST";
         std::vector<uint8_t> method_value_field = encode_string(method_value);
-        // std::cout << "Method value field size: " << method_value_field.size() << std::endl;
-        // std::cout << "Method value field: ";
-        // for (uint8_t byte : method_value_field) {
-        //     std::cout << (int)byte << " ";
-        // }
         binary_request.insert(binary_request.end(), method_value_field.begin(), method_value_field.end());
 
         // Scheme Length & Scheme
@@ -172,12 +216,6 @@ namespace ohttp {
         uint8_t enc[EVP_HPKE_MAX_ENC_LENGTH];
         size_t enc_len;
 
-        std::cout << "PK is " << std::endl;
-        for (size_t i = 0; i < pkR_len; i++) {
-            std::cout << std::hex << (int)pkR[i] << " ";
-        }
-        std::cout << std::endl;
-
         int rv = EVP_HPKE_CTX_setup_sender(
             /* *ctx */ sender_context.get(),
             /* *out_enc */ enc,
@@ -206,11 +244,6 @@ namespace ohttp {
             0x00, 0x01, // KDF ID
             0x00, 0x01, // AEAD ID
         };
-        std::cout << "Ciphertext: " << std::endl;
-        for (uint8_t byte : ciphertext) {
-            std::cout << std::dec << (int)byte << " ";
-        }
-        std::cout << std::endl;
         rv = EVP_HPKE_CTX_seal(
             /* *ctx */ sender_context.get(),
             /* *out */ ciphertext.data(),
@@ -224,18 +257,6 @@ namespace ohttp {
         if (rv != 1) {
             return {};
         }
-
-        std::cout << "enc" << std::endl;
-        for (uint8_t byte : enc) {
-            // As int and hex
-            std::cout << std::dec << (int)byte << " ";
-        }
-        std::cout << std::endl;
-        std::cout << "Ciphertext: " << std::endl;
-        for (uint8_t byte : ciphertext) {
-            std::cout << std::dec << (int)byte << " ";
-        }
-        std::cout << std::endl;
 
         // Per RFC 9292, the encapsulated request is the concatenation of the
         // aad, enc, and ciphertext.

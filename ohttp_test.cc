@@ -16,6 +16,14 @@ EVP_HPKE_KEY getKeys() {
   return *test_keypair;
 }
 
+TEST(OhttpTest, GetKeyConfig) {
+  EVP_HPKE_KEY keypair = getKeys();
+  std::vector<uint8_t> key_config = ohttp::generate_key_config(&keypair);
+
+  EXPECT_EQ(key_config.size(), 1 + 2 + 32 + 2 + 4);
+  EXPECT_EQ(key_config[0], 0);
+}
+
 // Exercise the HPKE library without testing our code just as
 // as a proof of concept to compare our code against.
 TEST(OhttpTest, TestVector1) {

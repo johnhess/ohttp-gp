@@ -27,6 +27,8 @@ namespace ohttp {
     // A function that simply returns the string "foo"
     const char* GetFoo();
 
+    std::vector<uint8_t> generate_key_config(EVP_HPKE_KEY *keypair);
+
     std::vector<uint8_t> encode_string(const std::string& str);
 
     OhttpParseErrorCode get_next_encoded_string(std::vector<uint8_t>& input, int offset, std::vector<uint8_t>& out, int& bytes_used);

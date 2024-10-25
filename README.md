@@ -12,8 +12,5 @@ While this library is intended to be reusable (e.g. withing the `gog` gateway), 
 ```
 mkdir build
 cd build
-cmake ..
-make
-# Run tests
-ctest
+cmake .. && make && ctest --output-on-failure
 ```
