@@ -29,11 +29,19 @@ namespace ohttp {
 
     std::vector<uint8_t> generate_key_config(EVP_HPKE_KEY *keypair);
 
+    std::vector<uint8_t> get_public_key(std::vector<uint8_t> key_config);
+
     std::vector<uint8_t> encode_string(const std::string& str);
 
     OhttpParseErrorCode get_next_encoded_string(std::vector<uint8_t>& input, int offset, std::vector<uint8_t>& out, int& bytes_used);
 
     std::vector<uint8_t> get_binary_request(const std::string& path, const std::string& host, const std::string& body);
+    
+    std::string get_url_from_binary_request(const std::vector<uint8_t>& binary_request);
+
+    std::string get_method_from_binary_request(const std::vector<uint8_t>& binary_request);
+
+    std::string get_body_from_binary_request(const std::vector<uint8_t>& binary_request);
     
     std::vector<uint8_t> get_encapsulated_request(const std::string& path, const std::string& host, const std::string& body, uint8_t* pkR, size_t pkR_len);
 

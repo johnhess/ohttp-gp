@@ -28,6 +28,20 @@ TEST(OhttpTest, GetKeyConfig) {
   EXPECT_EQ(key_config[1], 1 + 2 + 32 + 2 + 4);
 }
 
+TEST(OhttpTest, ExtractPublicKeyFromConfig) {
+  EVP_HPKE_KEY keypair = getKeys();
+  uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+  size_t public_key_len;
+  EXPECT_TRUE(EVP_HPKE_KEY_public_key(&keypair, public_key, &public_key_len, sizeof(public_key)));
+  std::vector<uint8_t> public_key_vec(public_key, public_key + public_key_len);
+
+  std::vector<uint8_t> key_config = ohttp::generate_key_config(&keypair);
+  std::vector<uint8_t> config_public_key = ohttp::get_public_key(key_config);
+
+  EXPECT_EQ(config_public_key.size(), 32);
+  EXPECT_EQ(config_public_key, public_key_vec);
+}
+
 // Exercise the HPKE library without testing our code just as
 // as a proof of concept to compare our code against.
 TEST(OhttpTest, TestVector1) {
@@ -216,6 +230,24 @@ TEST(OhttpTest, TestBinaryRequest) {
       // }
   };
   EXPECT_EQ(request, expected);
+}
+
+TEST(OhttpTest, ParseBinaryRequest)
+{
+  std::vector<uint8_t> request =
+      ohttp::get_binary_request("/", "ohttp-gateway.jthess.com", "foo");
+
+  std::string method = ohttp::get_method_from_binary_request(request);
+  std::string expected_method = "POST";
+  EXPECT_EQ(method, expected_method);
+
+  std::string url = ohttp::get_url_from_binary_request(request);
+  std::string expected_url = "https://ohttp-gateway.jthess.com/";
+  EXPECT_EQ(url, expected_url);
+
+  std::string body = ohttp::get_body_from_binary_request(request);
+  std::string expected_body = "foo";
+  EXPECT_EQ(body, expected_body);
 }
 
 // Test that encapsulation starts with the correct header.

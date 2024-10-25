@@ -42,6 +42,7 @@ namespace ohttp {
         // HPKE Public Key
         uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
         size_t public_key_len;
+        // TODO: Make compatible with Chromium (i.e. don't throw)
         if (!EVP_HPKE_KEY_public_key(keypair, public_key, &public_key_len, sizeof(public_key))) {
             throw std::runtime_error("Failed to get public key");
         }
@@ -68,6 +69,13 @@ namespace ohttp {
         config.insert(config.begin(), high_byte_length);
 
         return config;
+    }
+
+    std::vector<uint8_t> get_public_key(std::vector<uint8_t> key_config) {
+        // Extract the public key from the key configuration.
+        // The public key starts at the 5th byte of the key configuration and is 32 bytes long.
+        std::vector<uint8_t> public_key(key_config.begin() + 5, key_config.begin() + 37);
+        return public_key;
     }
 
     // Helper to encode a string as a binary vector (length-prefixed)
@@ -184,6 +192,56 @@ namespace ohttp {
         // No zero bytes.
         return binary_request;
     }
+
+    std::string get_url_from_binary_request(const std::vector<uint8_t>& binary_request) {
+        std::string url;
+        int offset = 0;
+        offset += 1; // Skip framing indicator
+        offset += 1 + binary_request[offset]; // Skip method
+        size_t scheme_length = binary_request[offset];
+        // Add Scheme to URL
+        for (size_t i = 0; i < scheme_length; i++) {
+            url.push_back(static_cast<char>(binary_request[offset + 1 + i]));
+        }
+        url += "://";
+        offset += 1 + scheme_length; // Skip scheme length and scheme
+        size_t authority_length = binary_request[offset];
+        for (size_t i = 0; i < authority_length; i++) {
+            url.push_back(static_cast<char>(binary_request[offset + 1 + i]));
+        }
+        offset += 1 + authority_length; // Skip authority length and authority
+        size_t path_length = binary_request[offset];
+        for (size_t i = 0; i < path_length; i++) {
+            url.push_back(static_cast<char>(binary_request[offset + 1 + i]));
+        }
+        return url;
+    }
+
+    std::string get_method_from_binary_request(const std::vector<uint8_t>& binary_request) {
+        std::string method;
+        size_t method_len = binary_request[1];
+        for (size_t i = 2; i < 2 + method_len; i++) {
+            method.push_back(static_cast<char>(binary_request[i]));
+        }
+        return method;
+    }
+
+    std::string get_body_from_binary_request(const std::vector<uint8_t>& binary_request) {
+        std::string body;
+        int offset = 0;
+        offset += 1; // Skip framing indicator
+        offset += 1 + binary_request[offset]; // Skip method
+        offset += 1 + binary_request[offset]; // Skip scheme
+        offset += 1 + binary_request[offset]; // Skip authority
+        offset += 1 + binary_request[offset]; // Skip path
+        offset += 1 + binary_request[offset]; // Skip header section
+        size_t body_length = binary_request[offset];
+        for (size_t i = 1; i <= body_length; i++) {
+            body.push_back(static_cast<char>(binary_request[offset + i]));
+        }
+        return body;
+    }
+
 
     // TODO: Support configurable relay/gateway/keys.
     std::vector<uint8_t> get_encapsulated_request(const std::string& path, const std::string& host, const std::string& body, uint8_t* pkR, size_t pkR_len) {
