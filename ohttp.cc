@@ -34,10 +34,10 @@ namespace ohttp {
         // KEM_ID
         const EVP_HPKE_KEM *kem = EVP_HPKE_KEY_kem(keypair);
         const uint16_t kem_id = EVP_HPKE_KEM_id(kem);
-        const uint8_t high_byte = (kem_id >> 8) & 0xFF;
-        const uint8_t low_byte = kem_id & 0xFF;
-        config.push_back(high_byte);
-        config.push_back(low_byte);
+        const uint8_t kem_high_byte = (kem_id >> 8) & 0xFF;
+        const uint8_t kem_low_byte = kem_id & 0xFF;
+        config.push_back(kem_high_byte);
+        config.push_back(kem_low_byte);
 
         // HPKE Public Key
         uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
@@ -56,6 +56,16 @@ namespace ohttp {
         config.push_back(0x01);
         config.push_back(0x00);
         config.push_back(0x01);
+
+        // Each encoded configuration is prefixed with a 2-byte integer in 
+        // network byte order that indicates the length of the key configuration
+        // in bytes. The length-prefixed encodings are concatenated to form a
+        // list.
+        const uint16_t length = config.size();
+        const uint8_t high_byte_length = (length >> 8) & 0xFF;
+        const uint8_t low_byte_length = length & 0xFF;
+        config.insert(config.begin(), low_byte_length);
+        config.insert(config.begin(), high_byte_length);
 
         return config;
     }
