@@ -232,6 +232,114 @@ TEST(OhttpTest, TestBinaryRequest) {
   EXPECT_EQ(request, expected);
 }
 
+TEST(OhttpTest, TestBinaryResponse) {
+  std::string response_message = "this is a response";
+  std::vector<uint8_t> response_message_vec = std::vector<uint8_t>(response_message.begin(), response_message.end());
+  std::vector<uint8_t> response = ohttp::get_binary_response(response_message_vec);
+  std::vector<uint8_t> expected = {
+    // Known-Length Response {
+    //   Framing Indicator (i) = 1,
+    //   Known-Length Informational Response (..) ...,
+    //   Final Response Control Data (..),
+    //   Known-Length Field Section (..),
+    //   Known-Length Content (..),
+    //   Known-Length Field Section (..),
+    //   Padding (..),
+    // }
+    1,
+
+    // No informational responses in this test.
+    // Known-Length Informational Response {
+    //   Informational Response Control Data (..),
+    //   Known-Length Field Section (..),
+    // }
+
+    // Final Response Control Data {
+    //   Status Code (i) = 200..599,
+    // }
+    200,
+
+    // Known-Length Field Section {
+    //   Length (i),
+    //   Field Line (..) ...,
+    // }
+    0,
+
+    // Known-Length Content {
+    //   Content Length (i),
+    //   Content (..),
+    // }
+    18, // Length of "this is a response"
+    't', 'h', 'i', 's', ' ', 'i', 's', ' ', 'a', ' ', 'r', 'e', 's', 'p', 'o', 'n', 's', 'e',
+
+    // Trailer section.
+    // Known-Length Field Section {
+    //   Length (i),
+    //   Field Line (..) ...,
+    // }
+    0,
+  };
+  EXPECT_EQ(response, expected);
+}
+
+TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
+  EVP_HPKE_KEY test_keypair = getKeys();
+  uint8_t pkR[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+  size_t pkR_len;
+  int rv = EVP_HPKE_KEY_public_key(
+      &test_keypair, pkR, &pkR_len, EVP_HPKE_MAX_PUBLIC_KEY_LENGTH);
+
+  EVP_HPKE_CTX sender_context;
+  std::vector<uint8_t> encapsulated_request =
+      ohttp::get_encapsulated_request(
+        &sender_context,
+        "/", "ohttp-gateway.jthess.com", "foo",
+        pkR,
+        pkR_len);
+    
+  EVP_HPKE_CTX receiver_context;
+  size_t max_req_out_len = encapsulated_request.size();
+  std::vector<uint8_t> request_bhttp(max_req_out_len);
+  size_t req_out_len;
+  size_t enc_len = 32;
+  u_int8_t enc[enc_len];
+  ohttp::DecapsulationErrorCode rv2 = ohttp::decapsulate_request(
+    &receiver_context,
+    encapsulated_request,
+    request_bhttp.data(),
+    &req_out_len,
+    enc,
+    enc_len,
+    max_req_out_len,
+    test_keypair);
+  EXPECT_EQ(rv2, ohttp::DecapsulationErrorCode::SUCCESS);
+
+  // Give a made up response.
+  std::vector<uint8_t> encapsulated_response = ohttp::encapsulate_response(
+    &receiver_context,
+    enc,
+    enc_len,
+    "this is a response");
+  // Be sure its actually populated; we'll verify contents below.
+  EXPECT_GT(encapsulated_response.size(), 32 + 18);
+
+  // Then decapsulate the response back at the sender.
+  size_t max_resp_out_len = encapsulated_response.size();
+  uint8_t response_bhttp[max_resp_out_len];
+  size_t resp_out_len;
+  ohttp::DecapsulationErrorCode rv3 = ohttp::decapsulate_response(
+    &sender_context,
+    enc,
+    enc_len,
+    encapsulated_response,
+    response_bhttp,
+    &resp_out_len,
+    max_resp_out_len);
+  EXPECT_EQ(rv3, ohttp::DecapsulationErrorCode::SUCCESS);
+
+  EXPECT_EQ(resp_out_len, 23);  // 18 plus the BHTTP encoding
+}
+
 TEST(OhttpTest, ParseBinaryRequest)
 {
   std::vector<uint8_t> request =
@@ -273,8 +381,9 @@ TEST(OhttpTest, TestEncapsulatedRequestHeader) {
       &test_keypair, pkR, &pkR_len, EVP_HPKE_MAX_PUBLIC_KEY_LENGTH);
   EXPECT_EQ(rv, 1); // Check if public key retrieval was successful
 
+  EVP_HPKE_CTX sender_context;
   std::vector<uint8_t> request =
-      ohttp::get_encapsulated_request("/", "ohttp-gateway.jthess.com", "foo", pkR, pkR_len);
+      ohttp::get_encapsulated_request(&sender_context, "/", "ohttp-gateway.jthess.com", "foo", pkR, pkR_len);
 
   std::vector<uint8_t> expected_hdr = {
       0x80,        // Key ID
@@ -304,11 +413,21 @@ TEST(OhttpTest, DecapsulateEmptyRequestFails) {
   EXPECT_EQ(rv, 1); // Check if public key retrieval was successful
 
   // Now, decapsulate it with the same keypair
+  EVP_HPKE_CTX receiver_context;
   std::vector<uint8_t> empty_request = {};
   std::vector<uint8_t> request_bhttp(0);
   size_t out_len;
+  size_t enc_len = 32;
+  uint8_t enc[enc_len];
   ohttp::DecapsulationErrorCode rv2 = ohttp::decapsulate_request(
-    empty_request, request_bhttp.data(), &out_len, 0, test_keypair);
+    &receiver_context,
+    empty_request,
+    request_bhttp.data(),
+    &out_len,
+    enc,
+    enc_len,
+    0,
+    test_keypair);
   EXPECT_EQ(rv2, ohttp::DecapsulationErrorCode::ERR_NO_ENCAPSULATED_HEADER);
 }
 
@@ -323,14 +442,25 @@ TEST(OhttpTest, EncapsulateAndDecapsulateRequest) {
   EXPECT_EQ(rv, 1); // Check if public key retrieval was successful
 
   // Encapsulate it
+  EVP_HPKE_CTX sender_context;
   std::vector<uint8_t> request =
-      ohttp::get_encapsulated_request("/", "ohttp-gateway.jthess.com", "foo", pkR, pkR_len);
+      ohttp::get_encapsulated_request(&sender_context, "/", "ohttp-gateway.jthess.com", "foo", pkR, pkR_len);
 
+  EVP_HPKE_CTX receiver_context;
   size_t max_out_len = request.size();
   std::vector<uint8_t> request_bhttp(max_out_len);
   size_t out_len;
+  size_t enc_len = 32;
+  uint8_t enc[enc_len];
   ohttp::DecapsulationErrorCode rv2 = ohttp::decapsulate_request(
-    request, request_bhttp.data(), &out_len, max_out_len, test_keypair);
+    &receiver_context,
+    request,
+    request_bhttp.data(),
+    &out_len,
+    enc,
+    enc_len,
+    max_out_len,
+    test_keypair);
   EXPECT_EQ(rv2, ohttp::DecapsulationErrorCode::SUCCESS);
 
   std::vector<uint8_t> expected_bhttp = ohttp::get_binary_request("/", "ohttp-gateway.jthess.com", "foo");

@@ -3,7 +3,10 @@
 #include <stdexcept>
 
 #include "ohttp.h"
+#include "openssl/hkdf.h"
 #include "openssl/hpke.h"
+#include "openssl/err.h"
+#include "openssl/rand.h"
 
 namespace ohttp {
 
@@ -193,6 +196,17 @@ namespace ohttp {
         return binary_request;
     }
 
+    std::vector<uint8_t> get_binary_response(const std::vector<uint8_t>& content) {
+      std::vector<uint8_t> binary_response;
+      binary_response.push_back(1); // Known-Length Informational Response
+      binary_response.push_back(200); // Status Code      
+      binary_response.push_back(0); // Known-Length Field Section Length
+      binary_response.push_back(content.size()); // Content Length
+      binary_response.insert(binary_response.end(), content.begin(), content.end());
+      binary_response.push_back(0); // Trailer section length
+      return binary_response;
+    }
+
     std::string get_url_from_binary_request(const std::vector<uint8_t>& binary_request) {
         std::string url;
         int offset = 0;
@@ -242,9 +256,14 @@ namespace ohttp {
         return body;
     }
 
-
     // TODO: Support configurable relay/gateway/keys.
-    std::vector<uint8_t> get_encapsulated_request(const std::string& path, const std::string& host, const std::string& body, uint8_t* pkR, size_t pkR_len) {
+    std::vector<uint8_t> get_encapsulated_request(
+      EVP_HPKE_CTX* sender_context,
+      const std::string& path,
+      const std::string& host,
+      const std::string& body,
+      uint8_t* pkR,
+      size_t pkR_len) {
         // Hard coded key config matching ohttp-gateway.jthess.com's
         // public key.
 
@@ -277,15 +296,12 @@ namespace ohttp {
         // Ciphertext & Friends:
         std::vector<uint8_t> encapsulated_request;  // will be aad + enc + ct
 
-        // Create a context
-        bssl::ScopedEVP_HPKE_CTX sender_context;
-
         // Ephemeral public key
         uint8_t enc[EVP_HPKE_MAX_ENC_LENGTH];
         size_t enc_len;
 
         int rv = EVP_HPKE_CTX_setup_sender(
-            /* *ctx */ sender_context.get(),
+            /* *ctx */ sender_context,
             /* *out_enc */ enc,
             /* *out_enc_len */ &enc_len,
             /*  max_enc */ sizeof(enc),
@@ -303,7 +319,7 @@ namespace ohttp {
 
         // Have sender encrypt message for the recipient.
         int ct_max_len = binary_request.size() +
-            EVP_HPKE_CTX_max_overhead(sender_context.get());
+            EVP_HPKE_CTX_max_overhead(sender_context);
         std::vector<uint8_t> ciphertext(ct_max_len);
         size_t ciphertext_len;
         std::vector<uint8_t> aad = {
@@ -313,7 +329,7 @@ namespace ohttp {
             0x00, 0x01, // AEAD ID
         };
         rv = EVP_HPKE_CTX_seal(
-            /* *ctx */ sender_context.get(),
+            /* *ctx */ sender_context,
             /* *out */ ciphertext.data(),
             /* *out_len */ &ciphertext_len,
             /*  max_out_len */ ciphertext.size(),
@@ -335,10 +351,289 @@ namespace ohttp {
         return encapsulated_request;
     }
 
+    std::vector<uint8_t> encapsulate_response(
+        EVP_HPKE_CTX* receiver_context,
+        uint8_t* enc,
+        size_t enc_len,
+        const std::string& response_body) {
+      std::vector<uint8_t> binary_response = get_binary_response(
+          std::vector<uint8_t>(response_body.begin(), response_body.end()));
+
+      std::cout << "Binary response size: " << binary_response.size() << std::endl;
+      for (size_t i = 0; i < binary_response.size(); i++) {
+          std::cout << (int)binary_response[i] << " ";
+      }
+      std::cout << std::endl;
+      
+      // random(max(Nn, Nk))
+      size_t secret_len = 16;
+      std::vector<uint8_t> secret(secret_len);
+      std::string context_str = "message/bhttp response";
+      std::vector<uint8_t> context = std::vector<uint8_t>(context_str.begin(), context_str.end());
+      size_t context_len = context.size();
+      int rv = EVP_HPKE_CTX_export(
+        /* *ctx */ receiver_context,
+        /* *out */ secret.data(),
+        /*  secret_len */ secret_len,
+        /* *context */ context.data(),
+        /*  context_len */ context_len
+      );
+      if (rv != 1) {
+        return {};
+      }
+
+      // Nonce of secret_len
+      std::vector<uint8_t> response_nonce(secret_len);
+      RAND_bytes(response_nonce.data(), secret_len);
+
+      // salt = concat(enc, response_nonce);
+      std::vector<uint8_t> salt(enc, enc + enc_len);
+      salt.insert(salt.end(), response_nonce.begin(), response_nonce.end());
+
+      // prk = Extract(salt, secret)
+      size_t prk_len;
+      uint8_t prk[EVP_MAX_MD_SIZE];
+      int rv2 = HKDF_extract(
+        /* *out_key */ prk,
+        /* *out_len */ &prk_len,
+        /* *digest */ EVP_sha256(),
+        /* *secret */ secret.data(),
+        /*  secret_len */ secret_len,
+        /* *salt */ salt.data(),
+        /*  salt_len */ salt.size()
+      );
+      if (rv2 != 1) {
+        return {};
+      }
+
+      // aead_key = Expand(prk, "key", Nk)
+      size_t aead_key_len = 16; // Nk
+      uint8_t aead_key[aead_key_len];
+      std::string info_key_str = "key";
+      uint8_t info_key[info_key_str.size()];
+      for (size_t i = 0; i < info_key_str.size(); i++) {
+        info_key[i] = info_key_str[i];
+      }
+      size_t info_key_len = sizeof(info_key);
+      int rv3 = HKDF_expand(
+        /* *out */ aead_key,
+        /*  out_len */ aead_key_len,
+        /* *digest */ EVP_sha256(),
+        /* *prk */ prk,
+        /*  prk_len */ prk_len,
+        /* *info */ info_key,
+        /*  info_len */ info_key_len
+      );
+      if (rv3 != 1) {
+        return {};
+      }
+
+      // aead_nonce = Expand(prk, "nonce", Nn)
+      size_t aead_nonce_len = 12; // Nn
+      uint8_t aead_nonce[aead_nonce_len];
+      std::string info_nonce_str = "nonce";
+      uint8_t info_nonce[info_nonce_str.size()];
+      for (size_t i = 0; i < info_nonce_str.size(); i++) {
+        info_nonce[i] = info_nonce_str[i];
+      }
+      size_t info_nonce_len = sizeof(info_nonce);
+      int rv4 = HKDF_expand(
+        /* *out */ aead_nonce,
+        /*  out_len */ aead_nonce_len,
+        /* *digest */ EVP_sha256(),
+        /* *prk */ prk,
+        /*  prk_len */ prk_len,
+        /* *info */ info_nonce,
+        /*  info_len */ info_nonce_len
+      );
+      if (rv4 != 1) {
+        return {};
+      }
+  
+      // ct = Seal(aead_key, aead_nonce, "", response)
+      const EVP_AEAD* aead = EVP_aead_aes_128_gcm();
+      EVP_AEAD_CTX *aead_ctx = EVP_AEAD_CTX_new(
+        /* *aead */ aead,
+        /* *key */ aead_key,
+        /*  key_len */ aead_key_len,
+        /*  tag_len */ EVP_AEAD_DEFAULT_TAG_LENGTH
+      );
+
+      size_t max_ct_len = binary_response.size() + EVP_AEAD_max_overhead(aead);
+      uint8_t ct[max_ct_len];
+      size_t ct_len;
+      size_t required_len = EVP_AEAD_nonce_length(aead);
+      if (required_len != aead_nonce_len) {
+        std::cout << "Nonce length mismatch, expected: " << required_len << "; got: " << aead_nonce_len << std::endl;
+        return {};
+      }
+      int rv5 = EVP_AEAD_CTX_seal(
+        /* *ctx */ aead_ctx,
+        /* *out */ ct,
+        /* *out_len */ &ct_len,
+        /*  max_out_len */ max_ct_len,
+        /* *nonce */ aead_nonce,
+        /*  nonce_len */ aead_nonce_len,
+        /* *in */ binary_response.data(),
+        /*  in_len */ binary_response.size(),
+        /* *ad */ nullptr,
+        /*  ad_len */ 0
+      );
+      if (rv5 != 1) {
+        return {};
+      }
+
+      // enc_response = concat(response_nonce, ct)
+      std::vector<uint8_t> enc_response;
+      enc_response.insert(enc_response.end(), response_nonce.begin(), response_nonce.end());
+      enc_response.insert(enc_response.end(), ct, ct + ct_len);
+
+      return enc_response;
+    }
+
+    DecapsulationErrorCode decapsulate_response(
+        EVP_HPKE_CTX* sender_context,
+        uint8_t* enc,
+        size_t enc_len,
+        std::vector<uint8_t> eresponse,
+        uint8_t* dresponse,
+        size_t* dresponse_len,
+        size_t max_drequest_len) {
+      // Separate into nonce and ciphertext
+      if (eresponse.size() < 12) {
+        std::cout << "return DecapsulationErrorCode::ERR_NO_AEAD_NONCE" << std::endl;
+        return DecapsulationErrorCode::ERR_NO_AEAD_NONCE;
+      }
+      std::vector<uint8_t> response_nonce(eresponse.begin(), eresponse.begin() + 16);
+      std::vector<uint8_t> ct(eresponse.begin() + 16, eresponse.end());
+      
+      size_t secret_len = 16;
+      std::vector<uint8_t> secret(secret_len);
+      std::string context_str = "message/bhttp response";
+      std::vector<uint8_t> context = std::vector<uint8_t>(context_str.begin(), context_str.end());
+      size_t context_len = context.size();
+      int rv = EVP_HPKE_CTX_export(
+        /* *ctx */ sender_context,
+        /* *out */ secret.data(),
+        /*  secret_len */ secret_len,
+        /* *context */ context.data(),
+        /*  context_len */ context_len
+      );
+      if (rv != 1) {
+        std::cout << "return DecapsulationErrorCode::ERR_NO_SECRET" << std::endl;
+        return DecapsulationErrorCode::ERR_NO_SECRET;
+      }
+
+      // salt = concat(enc, response_nonce);
+      std::vector<uint8_t> salt(enc, enc + enc_len);
+      salt.insert(salt.end(), response_nonce.begin(), response_nonce.end());
+
+      // prk = Extract(salt, secret)
+      size_t prk_len;
+      uint8_t prk[EVP_MAX_MD_SIZE];
+      int rv2 = HKDF_extract(
+        /* *out_key */ prk,
+        /* *out_len */ &prk_len,
+        /* *digest */ EVP_sha256(),
+        /* *secret */ secret.data(),
+        /*  secret_len */ secret_len,
+        /* *salt */ salt.data(),
+        /*  salt_len */ salt.size()
+      );
+      if (rv2 != 1) {
+        std::cout << "return DecapsulationErrorCode::ERR_NO_PRK" << std::endl;
+        return DecapsulationErrorCode::ERR_NO_PRK;
+      }
+
+      // aead_key = Expand(prk, "key", Nk)
+      size_t aead_key_len = 16; // Nk
+      uint8_t aead_key[aead_key_len];
+      std::string info_key_str = "key";
+      uint8_t info_key[info_key_str.size()];
+      for (size_t i = 0; i < info_key_str.size(); i++) {
+        info_key[i] = info_key_str[i];
+      }
+      size_t info_key_len = sizeof(info_key);
+      int rv3 = HKDF_expand(
+        /* *out */ aead_key,
+        /*  out_len */ aead_key_len,
+        /* *digest */ EVP_sha256(),
+        /* *prk */ prk,
+        /*  prk_len */ prk_len,
+        /* *info */ info_key,
+        /*  info_len */ info_key_len
+      );
+      if (rv3 != 1) {
+        std::cout << "return DecapsulationErrorCode::ERR_NO_AEAD_KEY" << std::endl;
+        return DecapsulationErrorCode::ERR_NO_AEAD_KEY;
+      }
+
+      // aead_nonce = Expand(prk, "nonce", Nn)
+      size_t aead_nonce_len = 12; // Nn
+      uint8_t aead_nonce[aead_nonce_len];
+      std::string info_nonce_str = "nonce";
+      uint8_t info_nonce[info_nonce_str.size()];
+      for (size_t i = 0; i < info_nonce_str.size(); i++) {
+        info_nonce[i] = info_nonce_str[i];
+      }
+      size_t info_nonce_len = sizeof(info_nonce);
+      int rv4 = HKDF_expand(
+        /* *out */ aead_nonce,
+        /*  out_len */ aead_nonce_len,
+        /* *digest */ EVP_sha256(),
+        /* *prk */ prk,
+        /*  prk_len */ prk_len,
+        /* *info */ info_nonce,
+        /*  info_len */ info_nonce_len
+      );
+      if (rv4 != 1) {
+        std::cout << "return DecapsulationErrorCode::ERR_NO_AEAD_NONCE" << std::endl;
+        return DecapsulationErrorCode::ERR_NO_AEAD_NONCE;
+      }
+      const EVP_AEAD* aead = EVP_aead_aes_128_gcm();
+      EVP_AEAD_CTX *aead_ctx = EVP_AEAD_CTX_new(
+        /* *aead */ aead,
+        /* *key */ aead_key,
+        /*  key_len */ aead_key_len,
+        /*  tag_len */ EVP_AEAD_DEFAULT_TAG_LENGTH
+      );
+      size_t max_pt_len = eresponse.size();
+      uint8_t pt[max_pt_len];
+      size_t pt_len;
+      int rv5 = EVP_AEAD_CTX_open(
+        /* *ctx */ aead_ctx,
+        /* *out */ pt,
+        /* *out_len */ &pt_len,
+        /*  max_out_len */ max_pt_len,
+        /* *nonce */ aead_nonce,
+        /*  nonce_len */ aead_nonce_len,
+        /* *in */ ct.data(),
+        /*  in_len */ ct.size(),
+        /* *ad */ nullptr,
+        /*  ad_len */ 0
+      );
+      if (rv5 != 1) {
+        return DecapsulationErrorCode::ERR_UNABLE_TO_OPEN_RESPONSE;
+      }
+
+      // Set the values the caller expects.
+      if (pt_len > max_drequest_len) {
+        std::cout << "return DecapsulationErrorCode::ERR_NO_BUFFER_SPACE" << std::endl;
+        return DecapsulationErrorCode::ERR_NO_BUFFER_SPACE;
+      }
+      *dresponse_len = pt_len;
+      std::copy(pt, pt + pt_len, dresponse);
+
+      return DecapsulationErrorCode::SUCCESS;
+    }
+
     DecapsulationErrorCode decapsulate_request(
+        EVP_HPKE_CTX* receiver_context,
         std::vector<uint8_t> erequest,
         uint8_t* drequest,
         size_t* drequest_len,
+        uint8_t* enc,
+        size_t enc_len,
         size_t max_drequest_len,
         EVP_HPKE_KEY recipient_keypair) {
 
@@ -358,10 +653,9 @@ namespace ohttp {
       if (erequest.size() < 39) {
         return DecapsulationErrorCode::ERR_NO_PUBLIC_KEY;
       }
-      size_t enc_len = 32;  // Hardcoded for now.
-      std::vector<uint8_t> enc;
-      for (size_t i = 7; i < 7 + enc_len; i++) {
-        enc.push_back(erequest[i]);
+      enc_len = 32;  // Hardcoded for now.
+      for (size_t i = 7; i < 39; i++) {
+        enc[i - 7] = erequest[i];
       }
 
       // The rest is the ciphertext.
@@ -386,15 +680,13 @@ namespace ohttp {
       info.push_back(0x00); info.push_back(0x01); // KDF ID
       info.push_back(0x00); info.push_back(0x01); // AEAD ID
       
-      // Create a context
-      bssl::ScopedEVP_HPKE_CTX receiver_context;
       int rv2 = EVP_HPKE_CTX_setup_recipient(
-        /* *ctx */ receiver_context.get(),
+        /* *ctx */ receiver_context,
         /* *key */ &recipient_keypair,
         /* *kdf */ EVP_hpke_hkdf_sha256(),
         /* *aead */ EVP_hpke_aes_128_gcm(),
-        /* *enc */ enc.data(),
-        /*  enc_len */ enc.size(),
+        /* *enc */ enc,
+        /*  enc_len */ enc_len,
         /* *info */ info.data(),
         /*  info_len */ info.size()
       );
@@ -403,7 +695,7 @@ namespace ohttp {
       }
 
       int rv3 = EVP_HPKE_CTX_open(
-        /* *ctx */ receiver_context.get(),
+        /* *ctx */ receiver_context,
         /* *out */ drequest,
         /* *out_len */ drequest_len,
         /*  max_out_len */ max_drequest_len,
