@@ -298,15 +298,11 @@ namespace ohttp {
         // Ciphertext & Friends:
         std::vector<uint8_t> encapsulated_request;  // will be aad + enc + ct
 
-        // Ephemeral public key
-        uint8_t enc[EVP_HPKE_MAX_ENC_LENGTH];
-        size_t enc_len;
-
         int rv = EVP_HPKE_CTX_setup_sender(
             /* *ctx */ sender_context,
-            /* *out_enc */ enc,
-            /* *out_enc_len */ &enc_len,
-            /*  max_enc */ sizeof(enc),
+            /* *out_enc */ client_enc,
+            /* *out_enc_len */ client_enc_len,
+            /*  max_enc */ EVP_HPKE_MAX_ENC_LENGTH,
             /* *kem */ EVP_hpke_x25519_hkdf_sha256(),  // We want 0x0020, DHKEM(X25519, HKDF-SHA256);	see: https://www.iana.org/assignments/hpke/hpke.xhtml
             /* *kdf */ EVP_hpke_hkdf_sha256(),         // 0x0001, HKDF-SHA256
             /* *aead */ EVP_hpke_aes_128_gcm(),        // 0x0001, AES-128-GCM
@@ -344,17 +340,10 @@ namespace ohttp {
             return {};
         }
 
-        // Put the values of enc and enc_len into client_enc and client_enc_len
-        // TODO: Pass client_* above instead of enc/enc_len so we don't need to copy.
-        *client_enc_len = enc_len;
-        for (size_t i = 0; i < enc_len; i++) {
-            client_enc[i] = enc[i];
-        }
-
         // Per RFC 9292, the encapsulated request is the concatenation of the
         // aad, enc, and ciphertext.
         encapsulated_request.insert(encapsulated_request.end(), aad.begin(), aad.end());
-        encapsulated_request.insert(encapsulated_request.end(), enc, enc + enc_len);
+        encapsulated_request.insert(encapsulated_request.end(), client_enc, client_enc + *client_enc_len);
         encapsulated_request.insert(encapsulated_request.end(), ciphertext.begin(), ciphertext.begin() + ciphertext_len);
 
         return encapsulated_request;
