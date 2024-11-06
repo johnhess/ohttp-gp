@@ -65,7 +65,7 @@ namespace ohttp {
 
     OhttpParseErrorCode get_next_encoded_string(std::vector<uint8_t>& input, int offset, std::vector<uint8_t>& out, int& bytes_used);
 
-    std::vector<uint8_t> get_binary_request(const std::string& path, const std::string& host, const std::string& body);
+    std::vector<uint8_t> get_binary_request(const std::string& method, const std::string& scheme, const std::string& host, const std::string& path, const std::string& body);
 
     std::vector<uint8_t> get_binary_response(const std::vector<uint8_t>& content);
     
@@ -75,7 +75,7 @@ namespace ohttp {
 
     std::string get_body_from_binary_request(const std::vector<uint8_t>& binary_request);
 
-    std::vector<uint8_t> get_encapsulated_request(EVP_HPKE_CTX* sender_context, const std::string& path, const std::string& host, const std::string& body, uint8_t* pkR, size_t pkR_len);
+    std::vector<uint8_t> get_encapsulated_request(EVP_HPKE_CTX* sender_context, const std::string& method, const std::string& scheme, const std::string& host, const std::string& path, const std::string& body, uint8_t* pkR, size_t pkR_len);
 
     std::vector<uint8_t> encapsulate_response(EVP_HPKE_CTX* reciever_context, uint8_t* enc, size_t enc_len, const std::string& response_body);
 

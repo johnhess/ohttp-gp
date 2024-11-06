@@ -115,7 +115,7 @@ namespace ohttp {
     }
 
     // Function to encode the POST request in binary format per RFC 9292
-    std::vector<uint8_t> get_binary_request(const std::string& path, const std::string& host, const std::string& body) {
+    std::vector<uint8_t> get_binary_request(const std::string& method, const std::string& scheme, const std::string& host, const std::string& path, const std::string& body) {
         std::vector<uint8_t> binary_request;
 
         // Known-Length Request {
@@ -144,13 +144,11 @@ namespace ohttp {
         // }
 
         // Method Length & Method
-        std::string method_value = "POST";
-        std::vector<uint8_t> method_value_field = encode_string(method_value);
+        std::vector<uint8_t> method_value_field = encode_string(method);
         binary_request.insert(binary_request.end(), method_value_field.begin(), method_value_field.end());
 
         // Scheme Length & Scheme
-        std::string scheme_value = "https";
-        std::vector<uint8_t> scheme_value_field = encode_string(scheme_value);
+        std::vector<uint8_t> scheme_value_field = encode_string(scheme);
         binary_request.insert(binary_request.end(), scheme_value_field.begin(), scheme_value_field.end());
         
         // Authority Length & Authority
@@ -259,8 +257,10 @@ namespace ohttp {
     // TODO: Support configurable relay/gateway/keys.
     std::vector<uint8_t> get_encapsulated_request(
       EVP_HPKE_CTX* sender_context,
-      const std::string& path,
+      const std::string& method,
+      const std::string& scheme,
       const std::string& host,
+      const std::string& path,
       const std::string& body,
       uint8_t* pkR,
       size_t pkR_len) {
@@ -276,7 +276,7 @@ namespace ohttp {
         //   HPKE AEAD ID                 0001 // AES-128-GCM	
 
         // Plaintext:
-        std::vector<uint8_t> binary_request = get_binary_request(path, host, body);
+        std::vector<uint8_t> binary_request = get_binary_request(method, scheme, host, path, body);
 
         // Info
         // Build a sequence of bytes (info) by concatenating the ASCII-encoded

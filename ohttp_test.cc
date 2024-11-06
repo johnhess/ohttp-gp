@@ -173,7 +173,7 @@ TEST(DecodeStringTest, TestDecodeString) {
 // Test binary request creation per https://www.rfc-editor.org/rfc/rfc9292
 TEST(OhttpTest, TestBinaryRequest) {
   std::vector<uint8_t> request =
-      ohttp::get_binary_request("/", "ohttp-gateway.jthess.com", "foo");
+      ohttp::get_binary_request("POST", "https", "ohttp-gateway.jthess.com", "/", "foo");
   std::vector<uint8_t> expected = {
       // Known-Length Request {
       //   Framing Indicator (i) = 0,
@@ -293,7 +293,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
   std::vector<uint8_t> encapsulated_request =
       ohttp::get_encapsulated_request(
         &sender_context,
-        "/", "ohttp-gateway.jthess.com", "foo",
+        "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
         pkR,
         pkR_len);
     
@@ -343,7 +343,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
 TEST(OhttpTest, ParseBinaryRequest)
 {
   std::vector<uint8_t> request =
-      ohttp::get_binary_request("/", "ohttp-gateway.jthess.com", "foo");
+      ohttp::get_binary_request("POST", "https", "ohttp-gateway.jthess.com", "/", "foo");
 
   std::string method = ohttp::get_method_from_binary_request(request);
   std::string expected_method = "POST";
@@ -383,7 +383,10 @@ TEST(OhttpTest, TestEncapsulatedRequestHeader) {
 
   EVP_HPKE_CTX sender_context;
   std::vector<uint8_t> request =
-      ohttp::get_encapsulated_request(&sender_context, "/", "ohttp-gateway.jthess.com", "foo", pkR, pkR_len);
+      ohttp::get_encapsulated_request(
+        &sender_context, 
+        "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
+        pkR, pkR_len);
 
   std::vector<uint8_t> expected_hdr = {
       0x80,        // Key ID
@@ -444,7 +447,10 @@ TEST(OhttpTest, EncapsulateAndDecapsulateRequest) {
   // Encapsulate it
   EVP_HPKE_CTX sender_context;
   std::vector<uint8_t> request =
-      ohttp::get_encapsulated_request(&sender_context, "/", "ohttp-gateway.jthess.com", "foo", pkR, pkR_len);
+      ohttp::get_encapsulated_request(
+        &sender_context,
+        "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
+        pkR, pkR_len);
 
   EVP_HPKE_CTX receiver_context;
   size_t max_out_len = request.size();
@@ -463,7 +469,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateRequest) {
     test_keypair);
   EXPECT_EQ(rv2, ohttp::DecapsulationErrorCode::SUCCESS);
 
-  std::vector<uint8_t> expected_bhttp = ohttp::get_binary_request("/", "ohttp-gateway.jthess.com", "foo");
+  std::vector<uint8_t> expected_bhttp = ohttp::get_binary_request("POST", "https", "ohttp-gateway.jthess.com", "/", "foo");
   EXPECT_EQ(out_len, expected_bhttp.size());
   std::vector<uint8_t> request_bhttp_vec(request_bhttp.data(), request_bhttp.data() + out_len);
   EXPECT_EQ(request_bhttp_vec, expected_bhttp);
