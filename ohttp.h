@@ -25,10 +25,34 @@ namespace ohttp {
         ERR_NO_AEAD_KEY,
         ERR_UNABLE_TO_OPEN_RESPONSE
     };
+    inline std::string DecapsulationErrorCodeToString(DecapsulationErrorCode code) {
+        switch (code) {
+            case DecapsulationErrorCode::SUCCESS: return "SUCCESS";
+            case DecapsulationErrorCode::ERR_NO_ENCAPSULATED_HEADER: return "ERR_NO_ENCAPSULATED_HEADER";
+            case DecapsulationErrorCode::ERR_NO_PUBLIC_KEY: return "ERR_NO_PUBLIC_KEY";
+            case DecapsulationErrorCode::ERR_NO_CIPHER_TEXT: return "ERR_NO_CIPHER_TEXT";
+            case DecapsulationErrorCode::ERR_NO_CONTEXT_CREATED: return "ERR_NO_CONTEXT_CREATED";
+            case DecapsulationErrorCode::ERR_UNABLE_TO_OPEN: return "ERR_UNABLE_TO_OPEN";
+            case DecapsulationErrorCode::ERR_NO_AEAD_NONCE: return "ERR_NO_AEAD_NONCE";
+            case DecapsulationErrorCode::ERR_NO_BUFFER_SPACE: return "ERR_NO_BUFFER_SPACE";
+            case DecapsulationErrorCode::ERR_NO_SECRET: return "ERR_NO_SECRET";
+            case DecapsulationErrorCode::ERR_NO_PRK: return "ERR_NO_PRK";
+            case DecapsulationErrorCode::ERR_NO_AEAD_KEY: return "ERR_NO_AEAD_KEY";
+            case DecapsulationErrorCode::ERR_UNABLE_TO_OPEN_RESPONSE: return "ERR_UNABLE_TO_OPEN_RESPONSE";
+            default: return "Unknown error code";
+        }
+    }
     enum class OhttpParseErrorCode {
         SUCCESS = 0,
         ERR_BAD_OFFSET,
     };
+    inline std::string OhttpParseErrorCodeToString(OhttpParseErrorCode code) {
+        switch (code) {
+            case OhttpParseErrorCode::SUCCESS: return "SUCCESS";
+            case OhttpParseErrorCode::ERR_BAD_OFFSET: return "ERR_BAD_OFFSET";
+            default: return "Unknown error code";
+        }
+    }
 
     // A function that simply returns the string "foo"
     const char* GetFoo();
