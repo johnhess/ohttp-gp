@@ -75,7 +75,7 @@ namespace ohttp {
 
     std::string get_body_from_binary_request(const std::vector<uint8_t>& binary_request);
 
-    std::vector<uint8_t> get_encapsulated_request(EVP_HPKE_CTX* sender_context, const std::string& method, const std::string& scheme, const std::string& host, const std::string& path, const std::string& body, uint8_t* pkR, size_t pkR_len);
+    std::vector<uint8_t> get_encapsulated_request(EVP_HPKE_CTX* sender_context, const std::string& method, const std::string& scheme, const std::string& host, const std::string& path, const std::string& body, uint8_t* client_enc, size_t* client_enc_len, uint8_t* pkR, size_t pkR_len);
 
     std::vector<uint8_t> encapsulate_response(EVP_HPKE_CTX* reciever_context, uint8_t* enc, size_t enc_len, const int response_code, const std::string& response_body);
 

@@ -262,6 +262,8 @@ namespace ohttp {
       const std::string& host,
       const std::string& path,
       const std::string& body,
+      uint8_t* client_enc,
+      size_t* client_enc_len,
       uint8_t* pkR,
       size_t pkR_len) {
         // Hard coded key config matching ohttp-gateway.jthess.com's
@@ -340,6 +342,13 @@ namespace ohttp {
         );
         if (rv != 1) {
             return {};
+        }
+
+        // Put the values of enc and enc_len into client_enc and client_enc_len
+        // TODO: Pass client_* above instead of enc/enc_len so we don't need to copy.
+        *client_enc_len = enc_len;
+        for (size_t i = 0; i < enc_len; i++) {
+            client_enc[i] = enc[i];
         }
 
         // Per RFC 9292, the encapsulated request is the concatenation of the

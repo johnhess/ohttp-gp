@@ -284,6 +284,8 @@ TEST(OhttpTest, TestBinaryResponse) {
 
 TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
   EVP_HPKE_KEY test_keypair = getKeys();
+  uint8_t client_enc[EVP_HPKE_MAX_ENC_LENGTH];
+  size_t client_enc_len;
   uint8_t pkR[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t pkR_len;
   int rv = EVP_HPKE_KEY_public_key(
@@ -294,9 +296,11 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
       ohttp::get_encapsulated_request(
         &sender_context,
         "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
+        client_enc,
+        &client_enc_len,
         pkR,
         pkR_len);
-    
+  std::cout << std::endl;
   EVP_HPKE_CTX receiver_context;
   size_t max_req_out_len = encapsulated_request.size();
   std::vector<uint8_t> request_bhttp(max_req_out_len);
@@ -330,8 +334,8 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
   size_t resp_out_len;
   ohttp::DecapsulationErrorCode rv3 = ohttp::decapsulate_response(
     &sender_context,
-    enc,
-    enc_len,
+    client_enc,
+    client_enc_len,
     encapsulated_response,
     response_bhttp,
     &resp_out_len,
@@ -376,6 +380,8 @@ TEST(OhttpTest, TestEncapsulatedRequestHeader) {
   // enc_request = concat(hdr, enc, ct)
 
   EVP_HPKE_KEY test_keypair = getKeys();
+  uint8_t client_enc[EVP_HPKE_MAX_ENC_LENGTH];
+  size_t client_enc_len;
   uint8_t pkR[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t pkR_len;
   int rv = EVP_HPKE_KEY_public_key(
@@ -387,6 +393,7 @@ TEST(OhttpTest, TestEncapsulatedRequestHeader) {
       ohttp::get_encapsulated_request(
         &sender_context, 
         "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
+        client_enc, &client_enc_len,
         pkR, pkR_len);
 
   std::vector<uint8_t> expected_hdr = {
@@ -439,6 +446,8 @@ TEST(OhttpTest, DecapsulateEmptyRequestFails) {
 TEST(OhttpTest, EncapsulateAndDecapsulateRequest) {
   // Recipient keys
   EVP_HPKE_KEY test_keypair = getKeys();
+  uint8_t client_enc[EVP_HPKE_MAX_ENC_LENGTH];
+  size_t client_enc_len;
   uint8_t pkR[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t pkR_len;
   int rv = EVP_HPKE_KEY_public_key(
@@ -451,6 +460,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateRequest) {
       ohttp::get_encapsulated_request(
         &sender_context,
         "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
+        client_enc, &client_enc_len,
         pkR, pkR_len);
 
   EVP_HPKE_CTX receiver_context;
