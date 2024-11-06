@@ -45,9 +45,8 @@ namespace ohttp {
         // HPKE Public Key
         uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
         size_t public_key_len;
-        // TODO: Make compatible with Chromium (i.e. don't throw)
         if (!EVP_HPKE_KEY_public_key(keypair, public_key, &public_key_len, sizeof(public_key))) {
-            throw std::runtime_error("Failed to get public key");
+            config.clear();
         }
         config.insert(config.end(), public_key, public_key + public_key_len);
 

@@ -21,7 +21,7 @@ TEST(OhttpTest, GetKeyConfig) {
   std::vector<uint8_t> key_config = ohttp::generate_key_config(&keypair);
 
   // 2 byte length plus one config
-  EXPECT_EQ(key_config.size(), 2 + 1 + 2 + 32 + 2 + 4);
+  EXPECT_EQ(key_config.size(), size_t(2 + 1 + 2 + 32 + 2 + 4));
 
   // First 2 bytes are remaining length
   EXPECT_EQ(key_config[0], 0);
@@ -290,6 +290,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
   size_t pkR_len;
   int rv = EVP_HPKE_KEY_public_key(
       &test_keypair, pkR, &pkR_len, EVP_HPKE_MAX_PUBLIC_KEY_LENGTH);
+  EXPECT_EQ(rv, 1);
 
   EVP_HPKE_CTX sender_context;
   std::vector<uint8_t> encapsulated_request =
@@ -326,7 +327,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
     200,
     "this is a response");
   // Be sure its actually populated; we'll verify contents below.
-  EXPECT_GT(encapsulated_response.size(), 32 + 18);
+  EXPECT_GT(encapsulated_response.size(), size_t(32 + 18));
 
   // Then decapsulate the response back at the sender.
   size_t max_resp_out_len = encapsulated_response.size();
@@ -342,7 +343,9 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
     max_resp_out_len);
   EXPECT_EQ(rv3, ohttp::DecapsulationErrorCode::SUCCESS);
 
-  EXPECT_EQ(resp_out_len, 23);  // 18 plus the BHTTP encoding
+  EXPECT_EQ(resp_out_len, 23);       // 18 plus the BHTTP encoding
+  EXPECT_EQ(response_bhttp[0], 1);   // Fixed length response
+  EXPECT_EQ(response_bhttp[1], 200); // Status code (Improperly encoded.  Fix this.)
 }
 
 TEST(OhttpTest, ParseBinaryRequest)
