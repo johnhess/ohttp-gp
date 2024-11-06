@@ -235,7 +235,7 @@ TEST(OhttpTest, TestBinaryRequest) {
 TEST(OhttpTest, TestBinaryResponse) {
   std::string response_message = "this is a response";
   std::vector<uint8_t> response_message_vec = std::vector<uint8_t>(response_message.begin(), response_message.end());
-  std::vector<uint8_t> response = ohttp::get_binary_response(response_message_vec);
+  std::vector<uint8_t> response = ohttp::get_binary_response(200, response_message_vec);
   std::vector<uint8_t> expected = {
     // Known-Length Response {
     //   Framing Indicator (i) = 1,
@@ -319,6 +319,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
     &receiver_context,
     enc,
     enc_len,
+    200,
     "this is a response");
   // Be sure its actually populated; we'll verify contents below.
   EXPECT_GT(encapsulated_response.size(), 32 + 18);

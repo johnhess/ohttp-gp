@@ -194,10 +194,10 @@ namespace ohttp {
         return binary_request;
     }
 
-    std::vector<uint8_t> get_binary_response(const std::vector<uint8_t>& content) {
+    std::vector<uint8_t> get_binary_response(const int response_code, const std::vector<uint8_t>& content) {
       std::vector<uint8_t> binary_response;
       binary_response.push_back(1); // Known-Length Informational Response
-      binary_response.push_back(200); // Status Code      
+      binary_response.push_back(response_code); // Status Code      
       binary_response.push_back(0); // Known-Length Field Section Length
       binary_response.push_back(content.size()); // Content Length
       binary_response.insert(binary_response.end(), content.begin(), content.end());
@@ -355,8 +355,10 @@ namespace ohttp {
         EVP_HPKE_CTX* receiver_context,
         uint8_t* enc,
         size_t enc_len,
+        const int response_code,
         const std::string& response_body) {
       std::vector<uint8_t> binary_response = get_binary_response(
+          response_code,
           std::vector<uint8_t>(response_body.begin(), response_body.end()));
 
       std::cout << "Binary response size: " << binary_response.size() << std::endl;
