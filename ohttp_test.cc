@@ -38,7 +38,7 @@ TEST(OhttpTest, ExtractPublicKeyFromConfig) {
   std::vector<uint8_t> key_config = ohttp::generate_key_config(&keypair);
   std::vector<uint8_t> config_public_key = ohttp::get_public_key(key_config);
 
-  EXPECT_EQ(config_public_key.size(), 32);
+  EXPECT_EQ(config_public_key.size(), size_t(32));
   EXPECT_EQ(config_public_key, public_key_vec);
 }
 
@@ -343,9 +343,9 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
     max_resp_out_len);
   EXPECT_EQ(rv3, ohttp::DecapsulationErrorCode::SUCCESS);
 
-  EXPECT_EQ(resp_out_len, 23);       // 18 plus the BHTTP encoding
-  EXPECT_EQ(response_bhttp[0], 1);   // Fixed length response
-  EXPECT_EQ(response_bhttp[1], 200); // Status code (Improperly encoded.  Fix this.)
+  EXPECT_EQ(resp_out_len, size_t(23)); // 18 plus the BHTTP encoding
+  EXPECT_EQ(response_bhttp[0], 1);     // Fixed length response
+  EXPECT_EQ(response_bhttp[1], 200);   // Status code (Improperly encoded.  Fix this.)
 }
 
 TEST(OhttpTest, ParseBinaryRequest)
