@@ -360,12 +360,6 @@ namespace ohttp {
       std::vector<uint8_t> binary_response = get_binary_response(
           response_code,
           std::vector<uint8_t>(response_body.begin(), response_body.end()));
-
-      std::cout << "Binary response size: " << binary_response.size() << std::endl;
-      for (size_t i = 0; i < binary_response.size(); i++) {
-          std::cout << (int)binary_response[i] << " ";
-      }
-      std::cout << std::endl;
       
       // random(max(Nn, Nk))
       size_t secret_len = 16;
