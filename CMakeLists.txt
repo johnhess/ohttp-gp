@@ -29,7 +29,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(boringssl)
 # Ensure BoringSSL builds
 add_library(bssl_crypto STATIC IMPORTED)
-set_target_properties(bssl_crypto PROPERTIES IMPORTED_LOCATION "${BoringSSL_BINARY_DIR}/crypto/libcrypto.a")
+set_target_properties(bssl_crypto PROPERTIES IMPORTED_LOCATION "${BoringSSL_BINARY_DIR}/libcrypto.a")
 
 # Add the main library (ohttp)
 add_library(ohttp ohttp.cc)
