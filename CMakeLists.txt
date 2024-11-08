@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 # Hide BoringSSL symbols.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Include FetchContent module
 include(FetchContent)
