@@ -17,6 +17,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 # Fetch BoringSSL from GitHub
+set(BUILD_SHARED_LIBS OFF)
+set(BORINGSSL_BUILD_TESTS OFF)
 FetchContent_Declare(
     boringssl
     GIT_REPOSITORY https://github.com/google/boringssl.git
