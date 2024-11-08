@@ -3,7 +3,7 @@ project(OhttpGP)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
-
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Include FetchContent module
 include(FetchContent)
