@@ -25,7 +25,7 @@ FetchContent_MakeAvailable(boringssl)
 
 # Add the main library (ohttp)
 add_library(ohttp ohttp.cc)
-target_link_libraries(ohttp PRIVATE crypto)
+target_link_libraries(ohttp PUBLIC crypto)
 
 # Add the test executable
 add_executable(ohttp_test ohttp_test.cc)
