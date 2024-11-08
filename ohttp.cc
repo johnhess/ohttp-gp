@@ -10,6 +10,10 @@
 
 namespace ohttp {
 
+    struct HPKE_KEY {
+        EVP_HPKE_KEY* internal_key;
+    };
+
     HPKE_KEY* createHpkeKey() {
         HPKE_KEY* key = new HPKE_KEY();
         key->internal_key = EVP_HPKE_KEY_new();
@@ -660,7 +664,7 @@ namespace ohttp {
         uint8_t* enc,
         size_t enc_len,
         size_t max_drequest_len,
-        HPKE_KEY recipient_keypair) {
+        HPKE_KEY* recipient_keypair) {
 
       // Break the request into 3 parts: AAD, ephemeral public key, and 
       // ciphertext.
@@ -707,7 +711,7 @@ namespace ohttp {
       
       int rv2 = EVP_HPKE_CTX_setup_recipient(
         /* *ctx */ receiver_context,
-        /* *key */ recipient_keypair.internal_key,
+        /* *key */ recipient_keypair->internal_key,
         /* *kdf */ EVP_hpke_hkdf_sha256(),
         /* *aead */ EVP_hpke_aes_128_gcm(),
         /* *enc */ enc,

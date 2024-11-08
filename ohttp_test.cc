@@ -213,7 +213,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
     enc,
     enc_len,
     max_req_out_len,
-    *test_keypair);
+    test_keypair);
   EXPECT_EQ(rv2, ohttp::DecapsulationErrorCode::SUCCESS);
 
   // Give a made up response.
@@ -338,7 +338,7 @@ TEST(OhttpTest, DecapsulateEmptyRequestFails) {
     enc,
     enc_len,
     0,
-    *test_keypair);
+    test_keypair);
   EXPECT_EQ(rv2, ohttp::DecapsulationErrorCode::ERR_NO_ENCAPSULATED_HEADER);
 }
 
@@ -377,7 +377,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateRequest) {
     enc,
     enc_len,
     max_out_len,
-    *test_keypair);
+    test_keypair);
   EXPECT_EQ(rv2, ohttp::DecapsulationErrorCode::SUCCESS);
 
   std::vector<uint8_t> expected_bhttp = ohttp::get_binary_request("POST", "https", "ohttp-gateway.jthess.com", "/", "foo");
