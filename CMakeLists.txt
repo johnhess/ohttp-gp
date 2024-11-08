@@ -31,7 +31,7 @@ target_link_libraries(ohttp PRIVATE crypto)
 add_executable(ohttp_test ohttp_test.cc)
 
 # Link Google Test and the main library (ohttp) to the test executable
-target_link_libraries(ohttp_test PRIVATE gtest gtest_main ohttp crypto)
+target_link_libraries(ohttp_test PRIVATE gtest gtest_main ohttp)
 
 # Enable testing
 enable_testing()
