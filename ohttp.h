@@ -11,6 +11,21 @@
 
 
 namespace ohttp {
+
+    // Wrappers for BoringSSL types
+    struct HPKE_KEY {
+        EVP_HPKE_KEY* internal_key;
+    };
+    HPKE_KEY* createHpkeKey();
+    void destroyHpkeKey(HPKE_KEY* key);
+
+    struct HPKE_KEM;
+    HPKE_KEM* createHpkeKem();
+    void destroyHpkeKem(HPKE_KEM* kem);
+
+    int HPKE_KEY_generate(HPKE_KEY* key, const HPKE_KEM* kem);
+    bool HPKE_KEY_public_key(HPKE_KEY* key, uint8_t* out, size_t* out_len, size_t max_out);
+
     enum class DecapsulationErrorCode {
         SUCCESS = 0,
         ERR_NO_ENCAPSULATED_HEADER,
@@ -54,10 +69,7 @@ namespace ohttp {
         }
     }
 
-    // A function that simply returns the string "foo"
-    const char* GetFoo();
-
-    std::vector<uint8_t> generate_key_config(EVP_HPKE_KEY *keypair);
+    std::vector<uint8_t> generate_key_config(HPKE_KEY *keypair);
 
     std::vector<uint8_t> get_public_key(std::vector<uint8_t> key_config);
 
@@ -79,7 +91,7 @@ namespace ohttp {
 
     std::vector<uint8_t> encapsulate_response(EVP_HPKE_CTX* reciever_context, uint8_t* enc, size_t enc_len, const int response_code, const std::string& response_body);
 
-    DecapsulationErrorCode decapsulate_request(EVP_HPKE_CTX* receiver_context, std::vector<uint8_t> erequest, uint8_t* drequest, size_t* drequest_len, uint8_t* enc, size_t enc_len, size_t max_drequest_len, EVP_HPKE_KEY recipient_keypair);
+    DecapsulationErrorCode decapsulate_request(EVP_HPKE_CTX* receiver_context, std::vector<uint8_t> erequest, uint8_t* drequest, size_t* drequest_len, uint8_t* enc, size_t enc_len, size_t max_drequest_len, HPKE_KEY recipient_keypair);
     
     DecapsulationErrorCode decapsulate_response(EVP_HPKE_CTX* sender_context, uint8_t* enc, size_t enc_len, std::vector<uint8_t> eresponse, uint8_t* dresponse, size_t* dresponse_len, size_t max_drequest_len);
 

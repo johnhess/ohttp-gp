@@ -10,12 +10,41 @@
 
 namespace ohttp {
 
-    const char* GetFoo() {
-        return "foo";
+    HPKE_KEY* createHpkeKey() {
+        HPKE_KEY* key = new HPKE_KEY();
+        key->internal_key = EVP_HPKE_KEY_new();
+        return key;
+    }
+
+    void destroyHpkeKey(HPKE_KEY* key) {
+        EVP_HPKE_KEY_free(key->internal_key);
+        delete key;
+    }
+
+    struct HPKE_KEM {
+        const EVP_HPKE_KEM* internal_kem;
+    };
+
+    HPKE_KEM* createHpkeKem() {
+        HPKE_KEM* kem = new HPKE_KEM();
+        kem->internal_kem = EVP_hpke_x25519_hkdf_sha256();
+        return kem;
+    }
+
+    void destroyHpkeKem(HPKE_KEM* kem) {
+        delete kem;
+    }
+
+    int HPKE_KEY_generate(HPKE_KEY* key, const HPKE_KEM* kem) {
+        return EVP_HPKE_KEY_generate(key->internal_key, kem->internal_kem);
+    }
+
+    bool HPKE_KEY_public_key(HPKE_KEY* key, uint8_t* out, size_t* out_len, size_t max_out) {
+        return EVP_HPKE_KEY_public_key(key->internal_key, out, out_len, max_out);
     }
 
     // Generates a config for a single keypair.
-    std::vector<uint8_t> generate_key_config(EVP_HPKE_KEY *keypair) {
+    std::vector<uint8_t> generate_key_config(HPKE_KEY *keypair) {
         // HPKE Symmetric Algorithms {
         //   HPKE KDF ID (16),
         //   HPKE AEAD ID (16),
@@ -35,7 +64,7 @@ namespace ohttp {
         config.push_back(0);
 
         // KEM_ID
-        const EVP_HPKE_KEM *kem = EVP_HPKE_KEY_kem(keypair);
+        const EVP_HPKE_KEM *kem = EVP_HPKE_KEY_kem(keypair->internal_key);
         const uint16_t kem_id = EVP_HPKE_KEM_id(kem);
         const uint8_t kem_high_byte = (kem_id >> 8) & 0xFF;
         const uint8_t kem_low_byte = kem_id & 0xFF;
@@ -45,9 +74,12 @@ namespace ohttp {
         // HPKE Public Key
         uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
         size_t public_key_len;
-        if (!EVP_HPKE_KEY_public_key(keypair, public_key, &public_key_len, sizeof(public_key))) {
+        EVP_HPKE_KEY* internal_key = keypair->internal_key;
+        if (!EVP_HPKE_KEY_public_key(internal_key, public_key, &public_key_len, sizeof(public_key))) {
             config.clear();
+            return config;
         }
+        std::cout << "Public key length: " << public_key_len << std::endl;
         config.insert(config.end(), public_key, public_key + public_key_len);
 
         // Symmetric Algorithms Length
@@ -628,7 +660,7 @@ namespace ohttp {
         uint8_t* enc,
         size_t enc_len,
         size_t max_drequest_len,
-        EVP_HPKE_KEY recipient_keypair) {
+        HPKE_KEY recipient_keypair) {
 
       // Break the request into 3 parts: AAD, ephemeral public key, and 
       // ciphertext.
@@ -675,7 +707,7 @@ namespace ohttp {
       
       int rv2 = EVP_HPKE_CTX_setup_recipient(
         /* *ctx */ receiver_context,
-        /* *key */ &recipient_keypair,
+        /* *key */ recipient_keypair.internal_key,
         /* *kdf */ EVP_hpke_hkdf_sha256(),
         /* *aead */ EVP_hpke_aes_128_gcm(),
         /* *enc */ enc,
