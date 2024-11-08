@@ -3,8 +3,7 @@ project(OhttpGP)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
+
 
 # Include FetchContent module
 include(FetchContent)
@@ -27,20 +26,26 @@ FetchContent_MakeAvailable(boringssl)
 
 # Add the main library (ohttp)
 add_library(ohttp ohttp.cc)
+# Keep BoringSSL from leaking through
+# macOS specific visibility settings
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 target_compile_options(ohttp PRIVATE
     -fvisibility=hidden
     -fvisibility-inlines-hidden
 )
+if(!APPLE)
+    set_target_properties(ohttp PROPERTIES 
+        LINK_FLAGS "-Wl,--exclude-libs,ALL"
+    )
+endif()
 target_link_libraries(ohttp PRIVATE crypto)
-set_target_properties(ohttp PROPERTIES 
-    LINK_FLAGS "-Wl,--exclude-libs,ALL"
-)
 
 # Add the test executable
 add_executable(ohttp_test ohttp_test.cc)
 
 # Link Google Test and the main library (ohttp) to the test executable
-target_link_libraries(ohttp_test PRIVATE gtest gtest_main ohttp crypto)
+target_link_libraries(ohttp_test PRIVATE gtest gtest_main ohttp)
 
 # Enable testing
 enable_testing()
