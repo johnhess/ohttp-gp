@@ -27,6 +27,9 @@ FetchContent_Declare(
     GIT_TAG e4978786daee58f51dcb98bc9665883d6f8567c0
 )
 FetchContent_MakeAvailable(boringssl)
+# Ensure BoringSSL builds
+add_library(bssl_crypto STATIC IMPORTED)
+set_target_properties(bssl_crypto PROPERTIES IMPORTED_LOCATION "${BoringSSL_BINARY_DIR}/crypto/libcrypto.a")
 
 # Add the main library (ohttp)
 add_library(ohttp ohttp.cc)
