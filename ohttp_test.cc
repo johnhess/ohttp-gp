@@ -29,7 +29,7 @@ TEST(OhttpTest, GetKeyConfig) {
 
 TEST(OhttpTest, ExtractPublicKeyFromConfig) {
   ohttp::HPKE_KEY* keypair = getKeys();
-  uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+  uint8_t public_key[ohttp::HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t public_key_len;
   EXPECT_TRUE(HPKE_KEY_public_key(keypair, public_key, &public_key_len, sizeof(public_key)));
   std::vector<uint8_t> public_key_vec(public_key, public_key + public_key_len);
@@ -181,32 +181,32 @@ TEST(OhttpTest, TestBinaryResponse) {
 
 TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
   ohttp::HPKE_KEY* test_keypair = getKeys();
-  uint8_t client_enc[EVP_HPKE_MAX_ENC_LENGTH];
+  uint8_t client_enc[ohttp::HPKE_MAX_ENC_LENGTH];
   size_t client_enc_len;
-  uint8_t pkR[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+  uint8_t pkR[ohttp::HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t pkR_len;
   int rv = ohttp::HPKE_KEY_public_key(
-      test_keypair, pkR, &pkR_len, EVP_HPKE_MAX_PUBLIC_KEY_LENGTH);
+      test_keypair, pkR, &pkR_len, ohttp::HPKE_MAX_PUBLIC_KEY_LENGTH);
   EXPECT_EQ(rv, 1);
 
-  EVP_HPKE_CTX sender_context;
+  ohttp::HPKE_CTX* sender_context = ohttp::createHpkeContext();
   std::vector<uint8_t> encapsulated_request =
       ohttp::get_encapsulated_request(
-        &sender_context,
+        sender_context,
         "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
         client_enc,
         &client_enc_len,
         pkR,
         pkR_len);
   std::cout << std::endl;
-  EVP_HPKE_CTX receiver_context;
+  ohttp::HPKE_CTX* receiver_context = ohttp::createHpkeContext();
   size_t max_req_out_len = encapsulated_request.size();
   std::vector<uint8_t> request_bhttp(max_req_out_len);
   size_t req_out_len;
   size_t enc_len = 32;
   u_int8_t enc[enc_len];
   ohttp::DecapsulationErrorCode rv2 = ohttp::decapsulate_request(
-    &receiver_context,
+    receiver_context,
     encapsulated_request,
     request_bhttp.data(),
     &req_out_len,
@@ -218,7 +218,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
 
   // Give a made up response.
   std::vector<uint8_t> encapsulated_response = ohttp::encapsulate_response(
-    &receiver_context,
+    receiver_context,
     enc,
     enc_len,
     200,
@@ -231,7 +231,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
   uint8_t response_bhttp[max_resp_out_len];
   size_t resp_out_len;
   ohttp::DecapsulationErrorCode rv3 = ohttp::decapsulate_response(
-    &sender_context,
+    sender_context,
     client_enc,
     client_enc_len,
     encapsulated_response,
@@ -280,18 +280,18 @@ TEST(OhttpTest, TestEncapsulatedRequestHeader) {
   // enc_request = concat(hdr, enc, ct)
 
   ohttp::HPKE_KEY* test_keypair = getKeys();
-  uint8_t client_enc[EVP_HPKE_MAX_ENC_LENGTH];
+  uint8_t client_enc[ohttp::HPKE_MAX_ENC_LENGTH];
   size_t client_enc_len;
-  uint8_t pkR[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+  uint8_t pkR[ohttp::HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t pkR_len;
   int rv = ohttp::HPKE_KEY_public_key(
-      test_keypair, pkR, &pkR_len, EVP_HPKE_MAX_PUBLIC_KEY_LENGTH);
+      test_keypair, pkR, &pkR_len, ohttp::HPKE_MAX_PUBLIC_KEY_LENGTH);
   EXPECT_EQ(rv, 1); // Check if public key retrieval was successful
 
-  EVP_HPKE_CTX sender_context;
+  ohttp::HPKE_CTX* sender_context = ohttp::createHpkeContext();
   std::vector<uint8_t> request =
       ohttp::get_encapsulated_request(
-        &sender_context, 
+        sender_context, 
         "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
         client_enc, &client_enc_len,
         pkR, pkR_len);
@@ -324,14 +324,14 @@ TEST(OhttpTest, DecapsulateEmptyRequestFails) {
   EXPECT_EQ(rv, 1); // Check if public key retrieval was successful
 
   // Now, decapsulate it with the same keypair
-  EVP_HPKE_CTX receiver_context;
+  ohttp::HPKE_CTX* receiver_context = ohttp::createHpkeContext();
   std::vector<uint8_t> empty_request = {};
   std::vector<uint8_t> request_bhttp(0);
   size_t out_len;
   size_t enc_len = 32;
   uint8_t enc[enc_len];
   ohttp::DecapsulationErrorCode rv2 = ohttp::decapsulate_request(
-    &receiver_context,
+    receiver_context,
     empty_request,
     request_bhttp.data(),
     &out_len,
@@ -346,31 +346,31 @@ TEST(OhttpTest, DecapsulateEmptyRequestFails) {
 TEST(OhttpTest, EncapsulateAndDecapsulateRequest) {
   // Recipient keys
   ohttp::HPKE_KEY* test_keypair = getKeys();
-  uint8_t client_enc[EVP_HPKE_MAX_ENC_LENGTH];
+  uint8_t client_enc[ohttp::HPKE_MAX_ENC_LENGTH];
   size_t client_enc_len;
-  uint8_t pkR[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+  uint8_t pkR[ohttp::HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t pkR_len;
   int rv = ohttp::HPKE_KEY_public_key(
-      test_keypair, pkR, &pkR_len, EVP_HPKE_MAX_PUBLIC_KEY_LENGTH);
+      test_keypair, pkR, &pkR_len, ohttp::HPKE_MAX_PUBLIC_KEY_LENGTH);
   EXPECT_EQ(rv, 1); // Check if public key retrieval was successful
 
   // Encapsulate it
-  EVP_HPKE_CTX sender_context;
+  ohttp::HPKE_CTX* sender_context = ohttp::createHpkeContext();
   std::vector<uint8_t> request =
       ohttp::get_encapsulated_request(
-        &sender_context,
+        sender_context,
         "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
         client_enc, &client_enc_len,
         pkR, pkR_len);
 
-  EVP_HPKE_CTX receiver_context;
+  ohttp::HPKE_CTX* receiver_context = ohttp::createHpkeContext();
   size_t max_out_len = request.size();
   std::vector<uint8_t> request_bhttp(max_out_len);
   size_t out_len;
   size_t enc_len = 32;
   uint8_t enc[enc_len];
   ohttp::DecapsulationErrorCode rv2 = ohttp::decapsulate_request(
-    &receiver_context,
+    receiver_context,
     request,
     request_bhttp.data(),
     &out_len,
