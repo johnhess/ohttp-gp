@@ -32,7 +32,7 @@ add_library(bssl_crypto STATIC IMPORTED)
 set_target_properties(bssl_crypto PROPERTIES IMPORTED_LOCATION "${BoringSSL_BINARY_DIR}/libcrypto.a")
 
 # Add the main library (ohttp)
-add_library(ohttp ohttp.cc)
+add_library(ohttp STATIC ohttp.cc)
 target_link_libraries(ohttp PRIVATE bssl_crypto ${BoringSSL_BINARY_DIR}/libssl.a)
 target_include_directories(ohttp PRIVATE ${boringssl_SOURCE_DIR}/include)
 
