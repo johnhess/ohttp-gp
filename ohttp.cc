@@ -10,12 +10,63 @@
 
 namespace ohttp {
 
-    const char* GetFoo() {
-        return "foo";
+    struct OHTTP_HPKE_CTX {
+        EVP_HPKE_CTX* internal_ctx;
+    };
+
+    OHTTP_HPKE_CTX* createHpkeContext() {
+        OHTTP_HPKE_CTX* ctx = new OHTTP_HPKE_CTX();
+        ctx->internal_ctx = EVP_HPKE_CTX_new();
+        return ctx;
     }
 
+    void destroyHpkeContext(OHTTP_HPKE_CTX* ctx) {
+        EVP_HPKE_CTX_free(ctx->internal_ctx);
+        delete ctx;
+    }
+
+    struct OHTTP_HPKE_KEY {
+        EVP_HPKE_KEY* internal_key;
+    };
+
+    OHTTP_HPKE_KEY* createHpkeKey() {
+        OHTTP_HPKE_KEY* key = new OHTTP_HPKE_KEY();
+        key->internal_key = EVP_HPKE_KEY_new();
+        return key;
+    }
+
+    void destroyHpkeKey(OHTTP_HPKE_KEY* key) {
+        EVP_HPKE_KEY_free(key->internal_key);
+        delete key;
+    }
+
+    struct OHTTP_HPKE_KEM {
+        const EVP_HPKE_KEM* internal_kem;
+    };
+
+    OHTTP_HPKE_KEM* createHpkeKem() {
+        OHTTP_HPKE_KEM* kem = new OHTTP_HPKE_KEM();
+        kem->internal_kem = EVP_hpke_x25519_hkdf_sha256();
+        return kem;
+    }
+
+    void destroyHpkeKem(OHTTP_HPKE_KEM* kem) {
+        delete kem;
+    }
+
+    int OHTTP_HPKE_KEY_generate(OHTTP_HPKE_KEY* key, const OHTTP_HPKE_KEM* kem) {
+        return EVP_HPKE_KEY_generate(key->internal_key, kem->internal_kem);
+    }
+
+    bool OHTTP_HPKE_KEY_public_key(OHTTP_HPKE_KEY* key, uint8_t* out, size_t* out_len, size_t max_out) {
+        return EVP_HPKE_KEY_public_key(key->internal_key, out, out_len, max_out);
+    }
+
+    const int OHTTP_HPKE_MAX_PUBLIC_KEY_LENGTH = EVP_HPKE_MAX_PUBLIC_KEY_LENGTH;
+    const int OHTTP_HPKE_MAX_ENC_LENGTH = EVP_HPKE_MAX_ENC_LENGTH;
+
     // Generates a config for a single keypair.
-    std::vector<uint8_t> generate_key_config(EVP_HPKE_KEY *keypair) {
+    std::vector<uint8_t> generate_key_config(OHTTP_HPKE_KEY *keypair) {
         // HPKE Symmetric Algorithms {
         //   HPKE KDF ID (16),
         //   HPKE AEAD ID (16),
@@ -35,7 +86,7 @@ namespace ohttp {
         config.push_back(0);
 
         // KEM_ID
-        const EVP_HPKE_KEM *kem = EVP_HPKE_KEY_kem(keypair);
+        const EVP_HPKE_KEM *kem = EVP_HPKE_KEY_kem(keypair->internal_key);
         const uint16_t kem_id = EVP_HPKE_KEM_id(kem);
         const uint8_t kem_high_byte = (kem_id >> 8) & 0xFF;
         const uint8_t kem_low_byte = kem_id & 0xFF;
@@ -45,9 +96,12 @@ namespace ohttp {
         // HPKE Public Key
         uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
         size_t public_key_len;
-        if (!EVP_HPKE_KEY_public_key(keypair, public_key, &public_key_len, sizeof(public_key))) {
+        EVP_HPKE_KEY* internal_key = keypair->internal_key;
+        if (!EVP_HPKE_KEY_public_key(internal_key, public_key, &public_key_len, sizeof(public_key))) {
             config.clear();
+            return config;
         }
+        std::cout << "Public key length: " << public_key_len << std::endl;
         config.insert(config.end(), public_key, public_key + public_key_len);
 
         // Symmetric Algorithms Length
@@ -255,7 +309,7 @@ namespace ohttp {
 
     // TODO: Support configurable relay/gateway/keys.
     std::vector<uint8_t> get_encapsulated_request(
-      EVP_HPKE_CTX* sender_context,
+      OHTTP_HPKE_CTX* sender_context,
       const std::string& method,
       const std::string& scheme,
       const std::string& host,
@@ -298,7 +352,7 @@ namespace ohttp {
         std::vector<uint8_t> encapsulated_request;  // will be aad + enc + ct
 
         int rv = EVP_HPKE_CTX_setup_sender(
-            /* *ctx */ sender_context,
+            /* *ctx */ sender_context->internal_ctx,
             /* *out_enc */ client_enc,
             /* *out_enc_len */ client_enc_len,
             /*  max_enc */ EVP_HPKE_MAX_ENC_LENGTH,
@@ -316,7 +370,7 @@ namespace ohttp {
 
         // Have sender encrypt message for the recipient.
         int ct_max_len = binary_request.size() +
-            EVP_HPKE_CTX_max_overhead(sender_context);
+            EVP_HPKE_CTX_max_overhead(sender_context->internal_ctx);
         std::vector<uint8_t> ciphertext(ct_max_len);
         size_t ciphertext_len;
         std::vector<uint8_t> aad = {
@@ -326,7 +380,7 @@ namespace ohttp {
             0x00, 0x01, // AEAD ID
         };
         rv = EVP_HPKE_CTX_seal(
-            /* *ctx */ sender_context,
+            /* *ctx */ sender_context->internal_ctx,
             /* *out */ ciphertext.data(),
             /* *out_len */ &ciphertext_len,
             /*  max_out_len */ ciphertext.size(),
@@ -349,7 +403,7 @@ namespace ohttp {
     }
 
     std::vector<uint8_t> encapsulate_response(
-        EVP_HPKE_CTX* receiver_context,
+        OHTTP_HPKE_CTX* receiver_context,
         uint8_t* enc,
         size_t enc_len,
         const int response_code,
@@ -365,7 +419,7 @@ namespace ohttp {
       std::vector<uint8_t> context = std::vector<uint8_t>(context_str.begin(), context_str.end());
       size_t context_len = context.size();
       int rv = EVP_HPKE_CTX_export(
-        /* *ctx */ receiver_context,
+        /* *ctx */ receiver_context->internal_ctx,
         /* *out */ secret.data(),
         /*  secret_len */ secret_len,
         /* *context */ context.data(),
@@ -485,7 +539,7 @@ namespace ohttp {
     }
 
     DecapsulationErrorCode decapsulate_response(
-        EVP_HPKE_CTX* sender_context,
+        OHTTP_HPKE_CTX* sender_context,
         uint8_t* enc,
         size_t enc_len,
         std::vector<uint8_t> eresponse,
@@ -506,7 +560,7 @@ namespace ohttp {
       std::vector<uint8_t> context = std::vector<uint8_t>(context_str.begin(), context_str.end());
       size_t context_len = context.size();
       int rv = EVP_HPKE_CTX_export(
-        /* *ctx */ sender_context,
+        /* *ctx */ sender_context->internal_ctx,
         /* *out */ secret.data(),
         /*  secret_len */ secret_len,
         /* *context */ context.data(),
@@ -621,14 +675,14 @@ namespace ohttp {
     }
 
     DecapsulationErrorCode decapsulate_request(
-        EVP_HPKE_CTX* receiver_context,
+        OHTTP_HPKE_CTX* receiver_context,
         std::vector<uint8_t> erequest,
         uint8_t* drequest,
         size_t* drequest_len,
         uint8_t* enc,
         size_t enc_len,
         size_t max_drequest_len,
-        EVP_HPKE_KEY recipient_keypair) {
+        OHTTP_HPKE_KEY* recipient_keypair) {
 
       // Break the request into 3 parts: AAD, ephemeral public key, and 
       // ciphertext.
@@ -674,8 +728,8 @@ namespace ohttp {
       info.push_back(0x00); info.push_back(0x01); // AEAD ID
       
       int rv2 = EVP_HPKE_CTX_setup_recipient(
-        /* *ctx */ receiver_context,
-        /* *key */ &recipient_keypair,
+        /* *ctx */ receiver_context->internal_ctx,
+        /* *key */ recipient_keypair->internal_key,
         /* *kdf */ EVP_hpke_hkdf_sha256(),
         /* *aead */ EVP_hpke_aes_128_gcm(),
         /* *enc */ enc,
@@ -688,7 +742,7 @@ namespace ohttp {
       }
 
       int rv3 = EVP_HPKE_CTX_open(
-        /* *ctx */ receiver_context,
+        /* *ctx */ receiver_context->internal_ctx,
         /* *out */ drequest,
         /* *out_len */ drequest_len,
         /*  max_out_len */ max_drequest_len,

@@ -7,10 +7,28 @@
 #include <string>
 #include <vector>
 
-#include "openssl/hpke.h"
-
 
 namespace ohttp {
+
+    // Wrappers for BoringSSL types
+    struct OHTTP_HPKE_CTX;
+    OHTTP_HPKE_CTX* createHpkeContext();
+    void destroyHpkeContext(OHTTP_HPKE_CTX* ctx);
+
+    struct OHTTP_HPKE_KEY;
+    OHTTP_HPKE_KEY* createHpkeKey();
+    void destroyHpkeKey(OHTTP_HPKE_KEY* key);
+
+    struct OHTTP_HPKE_KEM;
+    OHTTP_HPKE_KEM* createHpkeKem();
+    void destroyHpkeKem(OHTTP_HPKE_KEM* kem);
+
+    int OHTTP_HPKE_KEY_generate(OHTTP_HPKE_KEY* key, const OHTTP_HPKE_KEM* kem);
+    bool OHTTP_HPKE_KEY_public_key(OHTTP_HPKE_KEY* key, uint8_t* out, size_t* out_len, size_t max_out);
+
+    extern const int OHTTP_HPKE_MAX_PUBLIC_KEY_LENGTH;
+    extern const int OHTTP_HPKE_MAX_ENC_LENGTH;
+
     enum class DecapsulationErrorCode {
         SUCCESS = 0,
         ERR_NO_ENCAPSULATED_HEADER,
@@ -54,10 +72,7 @@ namespace ohttp {
         }
     }
 
-    // A function that simply returns the string "foo"
-    const char* GetFoo();
-
-    std::vector<uint8_t> generate_key_config(EVP_HPKE_KEY *keypair);
+    std::vector<uint8_t> generate_key_config(OHTTP_HPKE_KEY *keypair);
 
     std::vector<uint8_t> get_public_key(std::vector<uint8_t> key_config);
 
@@ -75,13 +90,13 @@ namespace ohttp {
 
     std::string get_body_from_binary_request(const std::vector<uint8_t>& binary_request);
 
-    std::vector<uint8_t> get_encapsulated_request(EVP_HPKE_CTX* sender_context, const std::string& method, const std::string& scheme, const std::string& host, const std::string& path, const std::string& body, uint8_t* client_enc, size_t* client_enc_len, uint8_t* pkR, size_t pkR_len);
+    std::vector<uint8_t> get_encapsulated_request(OHTTP_HPKE_CTX* sender_context, const std::string& method, const std::string& scheme, const std::string& host, const std::string& path, const std::string& body, uint8_t* client_enc, size_t* client_enc_len, uint8_t* pkR, size_t pkR_len);
 
-    std::vector<uint8_t> encapsulate_response(EVP_HPKE_CTX* reciever_context, uint8_t* enc, size_t enc_len, const int response_code, const std::string& response_body);
+    std::vector<uint8_t> encapsulate_response(OHTTP_HPKE_CTX* reciever_context, uint8_t* enc, size_t enc_len, const int response_code, const std::string& response_body);
 
-    DecapsulationErrorCode decapsulate_request(EVP_HPKE_CTX* receiver_context, std::vector<uint8_t> erequest, uint8_t* drequest, size_t* drequest_len, uint8_t* enc, size_t enc_len, size_t max_drequest_len, EVP_HPKE_KEY recipient_keypair);
+    DecapsulationErrorCode decapsulate_request(OHTTP_HPKE_CTX* receiver_context, std::vector<uint8_t> erequest, uint8_t* drequest, size_t* drequest_len, uint8_t* enc, size_t enc_len, size_t max_drequest_len, OHTTP_HPKE_KEY* recipient_keypair);
     
-    DecapsulationErrorCode decapsulate_response(EVP_HPKE_CTX* sender_context, uint8_t* enc, size_t enc_len, std::vector<uint8_t> eresponse, uint8_t* dresponse, size_t* dresponse_len, size_t max_drequest_len);
+    DecapsulationErrorCode decapsulate_response(OHTTP_HPKE_CTX* sender_context, uint8_t* enc, size_t enc_len, std::vector<uint8_t> eresponse, uint8_t* dresponse, size_t* dresponse_len, size_t max_drequest_len);
 
 } // namespace ohttp
 

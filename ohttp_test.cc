@@ -2,23 +2,22 @@
 
 #include "gtest/gtest.h"
 
-#include "openssl/hpke.h"
 #include "ohttp.h"
 
 namespace {
 
-EVP_HPKE_KEY getKeys() {
+ohttp::OHTTP_HPKE_KEY* getKeys() {
   // Use a newly derived keypair to do a roundtrip.
-  EVP_HPKE_KEY *test_keypair = EVP_HPKE_KEY_new();
-  const EVP_HPKE_KEM *kem = EVP_hpke_x25519_hkdf_sha256();
-  int rv = EVP_HPKE_KEY_generate(test_keypair, kem);
+  ohttp::OHTTP_HPKE_KEY* test_keypair = ohttp::createHpkeKey();
+  const ohttp::OHTTP_HPKE_KEM* kem = ohttp::createHpkeKem();
+  int rv = ohttp::OHTTP_HPKE_KEY_generate(test_keypair, kem);
   EXPECT_EQ(rv, 1); // Check if key generation was successful
-  return *test_keypair;
+  return test_keypair;
 }
 
 TEST(OhttpTest, GetKeyConfig) {
-  EVP_HPKE_KEY keypair = getKeys();
-  std::vector<uint8_t> key_config = ohttp::generate_key_config(&keypair);
+  ohttp::OHTTP_HPKE_KEY* keypair = getKeys();
+  std::vector<uint8_t> key_config = ohttp::generate_key_config(keypair);
 
   // 2 byte length plus one config
   EXPECT_EQ(key_config.size(), size_t(2 + 1 + 2 + 32 + 2 + 4));
@@ -29,119 +28,17 @@ TEST(OhttpTest, GetKeyConfig) {
 }
 
 TEST(OhttpTest, ExtractPublicKeyFromConfig) {
-  EVP_HPKE_KEY keypair = getKeys();
-  uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+  ohttp::OHTTP_HPKE_KEY* keypair = getKeys();
+  uint8_t public_key[ohttp::OHTTP_HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t public_key_len;
-  EXPECT_TRUE(EVP_HPKE_KEY_public_key(&keypair, public_key, &public_key_len, sizeof(public_key)));
+  EXPECT_TRUE(ohttp::OHTTP_HPKE_KEY_public_key(keypair, public_key, &public_key_len, sizeof(public_key)));
   std::vector<uint8_t> public_key_vec(public_key, public_key + public_key_len);
 
-  std::vector<uint8_t> key_config = ohttp::generate_key_config(&keypair);
+  std::vector<uint8_t> key_config = ohttp::generate_key_config(keypair);
   std::vector<uint8_t> config_public_key = ohttp::get_public_key(key_config);
 
   EXPECT_EQ(config_public_key.size(), size_t(32));
   EXPECT_EQ(config_public_key, public_key_vec);
-}
-
-// Exercise the HPKE library without testing our code just as
-// as a proof of concept to compare our code against.
-TEST(OhttpTest, TestVector1) {
-  const EVP_HPKE_KEM *kem = EVP_hpke_x25519_hkdf_sha256();    // 32
-  const EVP_HPKE_KDF *kdf = EVP_hpke_hkdf_sha256();           // 1
-  const EVP_HPKE_AEAD *aead = EVP_hpke_aes_128_gcm();         // 1
-
-  EXPECT_TRUE(aead);
-  EXPECT_TRUE(kdf);
-
-  // Recipient keypair
-  // Use the ones from the test server
-  // 7a04f3070f2fc4c52c06eb373060b415dbd8e82effe4088965a2602c27b91646
-  // std::vector<uint8_t> public_key_r_ = {
-  //   0x7a, 0x04, 0xf3, 0x07, 0x0f, 0x2f, 0xc4, 0xc5,
-  //   0x2c, 0x06, 0xeb, 0x37, 0x30, 0x60, 0xb4, 0x15,
-  //   0xdb, 0xd8, 0xe8, 0x2e, 0xff, 0xe4, 0x08, 0x89,
-  //   0x65, 0xa2, 0x60, 0x2c, 0x27, 0xb9, 0x16, 0x46
-  // };
-  // 
-  // std::vector<uint8_t> secret_key_r_ = {}; 
-  std::vector<uint8_t> public_key_r_ = {0x39, 0x48, 0xcf, 0xe0, 0xad, 0x1d, 0xdb, 0x69, 0x5d, 0x78, 0x0e, 0x59, 0x07, 0x71, 0x95, 0xda, 0x6c, 0x56, 0x50, 0x6b, 0x02, 0x73, 0x29, 0x79, 0x4a, 0xb0, 0x2b, 0xca, 0x80, 0x81, 0x5c, 0x4d};
-  std::vector<uint8_t> secret_key_r_ = {0x46, 0x12, 0xc5, 0x50, 0x26, 0x3f, 0xc8, 0xad, 0x58, 0x37, 0x5d, 0xf3, 0xf5, 0x57, 0xaa, 0xc5, 0x31, 0xd2, 0x68, 0x50, 0x90, 0x3e, 0x55, 0xa9, 0xf2, 0x3f, 0x21, 0xd8, 0x53, 0x4e, 0x8a, 0xc8};
-
-  std::vector<uint8_t> info_ = {0x44, 0x20, 0x65, 0x20, 0x6f, 0x6e, 0x20, 0x61, 0x20, 0x47, 0x72, 0x65, 0x63, 0x69, 0x61, 0x6e, 0x20, 0x55, 0x72, 0x6e};
-  
-  // First round
-  std::vector<uint8_t> aad = {0x43, 0x6f, 0x75, 0x6e, 0x74, 0x2d, 0x30}; 
-  std::vector<uint8_t> ct = {0xf9, 0x38, 0x55, 0x8b, 0x5d, 0x72, 0xf1, 0xa2, 0x38, 0x10, 0xb4, 0xbe, 0x2a, 0xb4, 0xf8, 0x43, 0x31, 0xac, 0xc0, 0x2f, 0xc9, 0x7b, 0xab, 0xc5, 0x3a, 0x52, 0xae, 0x82, 0x18, 0xa3, 0x55, 0xa9, 0x6d, 0x87, 0x70, 0xac, 0x83, 0xd0, 0x7b, 0xea, 0x87, 0xe1, 0x3c, 0x51, 0x2a};
-  std::vector<uint8_t> nonce = {0x56, 0xd8, 0x90, 0xe5, 0xac, 0xca, 0xaf, 0x01, 0x1c, 0xff, 0x4b, 0x7d};
-  std::vector<uint8_t> pt = {0x42, 0x65, 0x61, 0x75, 0x74, 0x79, 0x20, 0x69, 0x73, 0x20, 0x74, 0x72, 0x75, 0x74, 0x68, 0x2c, 0x20, 0x74, 0x72, 0x75, 0x74, 0x68, 0x20, 0x62, 0x65, 0x61, 0x75, 0x74, 0x79};
-  
-  // Ephemeral keys
-  std::vector<uint8_t> secret_key_e_ = {0x52, 0xc4, 0xa7, 0x58, 0xa8, 0x02, 0xcd, 0x8b, 0x93, 0x6e, 0xce, 0xea, 0x31, 0x44, 0x32, 0x79, 0x8d, 0x5b, 0xaf, 0x2d, 0x7e, 0x92, 0x35, 0xdc, 0x08, 0x4a, 0xb1, 0xb9, 0xcf, 0xa2, 0xf7, 0x36};
-  std::vector<uint8_t> public_key_e_ = {0x37, 0xfd, 0xa3, 0x56, 0x7b, 0xdb, 0xd6, 0x28, 0xe8, 0x86, 0x68, 0xc3, 0xc8, 0xd7, 0xe9, 0x7d, 0x1d, 0x12, 0x53, 0xb6, 0xd4, 0xea, 0x6d, 0x44, 0xc1, 0x50, 0xf7, 0x41, 0xf1, 0xbf, 0x44, 0x31};
-
-  bssl::ScopedEVP_HPKE_CTX sender_ctx;
-  uint8_t enc[EVP_HPKE_MAX_ENC_LENGTH];  // len is 32
-  size_t enc_len;
-  // Like our usual setup, but with known seed in secrect_key_e_.
-  EXPECT_TRUE(EVP_HPKE_CTX_setup_sender_with_seed_for_testing(
-      sender_ctx.get(), enc, &enc_len, sizeof(enc), kem, kdf, aead,
-      public_key_r_.data(), public_key_r_.size(), info_.data(), info_.size(),
-      secret_key_e_.data(), secret_key_e_.size()));
-
-  std::vector<uint8_t> enc_vec(enc, enc + enc_len);
-  EXPECT_EQ(enc_vec, public_key_e_);
-
-  // Verify first output
-  std::vector<uint8_t> encrypted(pt.size() + EVP_HPKE_CTX_max_overhead(sender_ctx.get()));
-  size_t encrypted_len;
-  EXPECT_EQ(1, EVP_HPKE_CTX_seal(sender_ctx.get(), encrypted.data(), &encrypted_len,
-                                 encrypted.size(), pt.data(),
-                                 pt.size(), aad.data(),
-                                 aad.size()));
-  std::vector<uint8_t> encrypted_vec(encrypted.data(), encrypted.data() + encrypted_len);
-  // EXPECT_EQ(encrypted_vec, ct);
-
-  // Test the recipient.
-  bssl::ScopedEVP_HPKE_KEY base_key;
-  ASSERT_TRUE(EVP_HPKE_KEY_init(base_key.get(), kem, secret_key_r_.data(),
-                                secret_key_r_.size()));
-
-  const EVP_HPKE_KEY *key = base_key.get();
-
-  uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
-  size_t public_key_len;
-  EXPECT_TRUE(EVP_HPKE_KEY_public_key(key, public_key, &public_key_len,
-                                      sizeof(public_key)));
-  std::vector<uint8_t> public_key_vec(public_key, public_key + public_key_len);
-  EXPECT_EQ(public_key_vec, public_key_r_);
-
-  // Now the same with the private key
-  uint8_t secret_key[EVP_HPKE_MAX_PRIVATE_KEY_LENGTH];
-  size_t secret_key_len;
-  EXPECT_TRUE(EVP_HPKE_KEY_private_key(key, secret_key, &secret_key_len,
-                                       sizeof(secret_key)));
-  std::vector<uint8_t> secret_key_vec(secret_key, secret_key + secret_key_len);
-  EXPECT_EQ(secret_key_vec, secret_key_r_);
-
-  // Set up the recipient
-  bssl::ScopedEVP_HPKE_CTX recipient_ctx;
-  EXPECT_TRUE(EVP_HPKE_CTX_setup_recipient(recipient_ctx.get(), key, kdf,
-                                           aead, enc, enc_len, info_.data(),
-                                           info_.size()));
-
-  // Verify Decryption
-  std::vector<uint8_t> decrypted(ct.size());
-  size_t decrypted_len;
-  EXPECT_EQ(1, EVP_HPKE_CTX_open(recipient_ctx.get(), decrypted.data(),
-                                  &decrypted_len, decrypted.size(),
-                                  encrypted.data(), encrypted_len, aad.data(),
-                                  aad.size()));
-  std::vector<uint8_t> decrypted_vec(decrypted.data(), decrypted.data() + decrypted_len);
-  EXPECT_EQ(decrypted_vec, pt);
-}
-
-// Test a sample function to make sure build is setup correctly.
-TEST(OhttpTest, TestOHTTPDetected) {
-  EXPECT_EQ(ohttp::GetFoo(), "foo");
 }
 
 // Test encoding strings.
@@ -283,33 +180,33 @@ TEST(OhttpTest, TestBinaryResponse) {
 }
 
 TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
-  EVP_HPKE_KEY test_keypair = getKeys();
-  uint8_t client_enc[EVP_HPKE_MAX_ENC_LENGTH];
+  ohttp::OHTTP_HPKE_KEY* test_keypair = getKeys();
+  uint8_t client_enc[ohttp::OHTTP_HPKE_MAX_ENC_LENGTH];
   size_t client_enc_len;
-  uint8_t pkR[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+  uint8_t pkR[ohttp::OHTTP_HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t pkR_len;
-  int rv = EVP_HPKE_KEY_public_key(
-      &test_keypair, pkR, &pkR_len, EVP_HPKE_MAX_PUBLIC_KEY_LENGTH);
+  int rv = ohttp::OHTTP_HPKE_KEY_public_key(
+      test_keypair, pkR, &pkR_len, ohttp::OHTTP_HPKE_MAX_PUBLIC_KEY_LENGTH);
   EXPECT_EQ(rv, 1);
 
-  EVP_HPKE_CTX sender_context;
+  ohttp::OHTTP_HPKE_CTX* sender_context = ohttp::createHpkeContext();
   std::vector<uint8_t> encapsulated_request =
       ohttp::get_encapsulated_request(
-        &sender_context,
+        sender_context,
         "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
         client_enc,
         &client_enc_len,
         pkR,
         pkR_len);
   std::cout << std::endl;
-  EVP_HPKE_CTX receiver_context;
+  ohttp::OHTTP_HPKE_CTX* receiver_context = ohttp::createHpkeContext();
   size_t max_req_out_len = encapsulated_request.size();
   std::vector<uint8_t> request_bhttp(max_req_out_len);
   size_t req_out_len;
   size_t enc_len = 32;
   u_int8_t enc[enc_len];
   ohttp::DecapsulationErrorCode rv2 = ohttp::decapsulate_request(
-    &receiver_context,
+    receiver_context,
     encapsulated_request,
     request_bhttp.data(),
     &req_out_len,
@@ -321,7 +218,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
 
   // Give a made up response.
   std::vector<uint8_t> encapsulated_response = ohttp::encapsulate_response(
-    &receiver_context,
+    receiver_context,
     enc,
     enc_len,
     200,
@@ -334,7 +231,7 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
   uint8_t response_bhttp[max_resp_out_len];
   size_t resp_out_len;
   ohttp::DecapsulationErrorCode rv3 = ohttp::decapsulate_response(
-    &sender_context,
+    sender_context,
     client_enc,
     client_enc_len,
     encapsulated_response,
@@ -382,19 +279,19 @@ TEST(OhttpTest, TestEncapsulatedRequestHeader) {
   // ct = sctxt.Seal("", request)
   // enc_request = concat(hdr, enc, ct)
 
-  EVP_HPKE_KEY test_keypair = getKeys();
-  uint8_t client_enc[EVP_HPKE_MAX_ENC_LENGTH];
+  ohttp::OHTTP_HPKE_KEY* test_keypair = getKeys();
+  uint8_t client_enc[ohttp::OHTTP_HPKE_MAX_ENC_LENGTH];
   size_t client_enc_len;
-  uint8_t pkR[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+  uint8_t pkR[ohttp::OHTTP_HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t pkR_len;
-  int rv = EVP_HPKE_KEY_public_key(
-      &test_keypair, pkR, &pkR_len, EVP_HPKE_MAX_PUBLIC_KEY_LENGTH);
+  int rv = ohttp::OHTTP_HPKE_KEY_public_key(
+      test_keypair, pkR, &pkR_len, ohttp::OHTTP_HPKE_MAX_PUBLIC_KEY_LENGTH);
   EXPECT_EQ(rv, 1); // Check if public key retrieval was successful
 
-  EVP_HPKE_CTX sender_context;
+  ohttp::OHTTP_HPKE_CTX* sender_context = ohttp::createHpkeContext();
   std::vector<uint8_t> request =
       ohttp::get_encapsulated_request(
-        &sender_context, 
+        sender_context, 
         "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
         client_enc, &client_enc_len,
         pkR, pkR_len);
@@ -418,23 +315,23 @@ TEST(OhttpTest, TestEncapsulatedRequestHeader) {
 }
 
 TEST(OhttpTest, DecapsulateEmptyRequestFails) {
-  EVP_HPKE_KEY test_keypair = getKeys();
+  ohttp::OHTTP_HPKE_KEY* test_keypair = getKeys();
   size_t pkR_len = 32;
   uint8_t pkR[pkR_len];
   size_t written;
-  int rv = EVP_HPKE_KEY_public_key(
-      &test_keypair, pkR, &written, pkR_len);
+  int rv = ohttp::OHTTP_HPKE_KEY_public_key(
+      test_keypair, pkR, &written, pkR_len);
   EXPECT_EQ(rv, 1); // Check if public key retrieval was successful
 
   // Now, decapsulate it with the same keypair
-  EVP_HPKE_CTX receiver_context;
+  ohttp::OHTTP_HPKE_CTX* receiver_context = ohttp::createHpkeContext();
   std::vector<uint8_t> empty_request = {};
   std::vector<uint8_t> request_bhttp(0);
   size_t out_len;
   size_t enc_len = 32;
   uint8_t enc[enc_len];
   ohttp::DecapsulationErrorCode rv2 = ohttp::decapsulate_request(
-    &receiver_context,
+    receiver_context,
     empty_request,
     request_bhttp.data(),
     &out_len,
@@ -448,32 +345,32 @@ TEST(OhttpTest, DecapsulateEmptyRequestFails) {
 // Enc/Decapsulate routrip test
 TEST(OhttpTest, EncapsulateAndDecapsulateRequest) {
   // Recipient keys
-  EVP_HPKE_KEY test_keypair = getKeys();
-  uint8_t client_enc[EVP_HPKE_MAX_ENC_LENGTH];
+  ohttp::OHTTP_HPKE_KEY* test_keypair = getKeys();
+  uint8_t client_enc[ohttp::OHTTP_HPKE_MAX_ENC_LENGTH];
   size_t client_enc_len;
-  uint8_t pkR[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+  uint8_t pkR[ohttp::OHTTP_HPKE_MAX_PUBLIC_KEY_LENGTH];
   size_t pkR_len;
-  int rv = EVP_HPKE_KEY_public_key(
-      &test_keypair, pkR, &pkR_len, EVP_HPKE_MAX_PUBLIC_KEY_LENGTH);
+  int rv = ohttp::OHTTP_HPKE_KEY_public_key(
+      test_keypair, pkR, &pkR_len, ohttp::OHTTP_HPKE_MAX_PUBLIC_KEY_LENGTH);
   EXPECT_EQ(rv, 1); // Check if public key retrieval was successful
 
   // Encapsulate it
-  EVP_HPKE_CTX sender_context;
+  ohttp::OHTTP_HPKE_CTX* sender_context = ohttp::createHpkeContext();
   std::vector<uint8_t> request =
       ohttp::get_encapsulated_request(
-        &sender_context,
+        sender_context,
         "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
         client_enc, &client_enc_len,
         pkR, pkR_len);
 
-  EVP_HPKE_CTX receiver_context;
+  ohttp::OHTTP_HPKE_CTX* receiver_context = ohttp::createHpkeContext();
   size_t max_out_len = request.size();
   std::vector<uint8_t> request_bhttp(max_out_len);
   size_t out_len;
   size_t enc_len = 32;
   uint8_t enc[enc_len];
   ohttp::DecapsulationErrorCode rv2 = ohttp::decapsulate_request(
-    &receiver_context,
+    receiver_context,
     request,
     request_bhttp.data(),
     &out_len,
