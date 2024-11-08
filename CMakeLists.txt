@@ -33,7 +33,7 @@ set_target_properties(bssl_crypto PROPERTIES IMPORTED_LOCATION "${BoringSSL_BINA
 
 # Add the main library (ohttp)
 add_library(ohttp ohttp.cc)
-target_link_libraries(ohttp PRIVATE ${BoringSSL_BINARY_DIR}/libcrypto.a ${BoringSSL_BINARY_DIR}/libssl.a)
+target_link_libraries(ohttp PRIVATE bssl_crypto ${BoringSSL_BINARY_DIR}/libssl.a)
 target_include_directories(ohttp PRIVATE ${boringssl_SOURCE_DIR}/include)
 
 # Add the test executable
