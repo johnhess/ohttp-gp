@@ -98,6 +98,8 @@ namespace ohttp {
 
     OHTTP_EXPORT std::string get_body_from_binary_request(const std::vector<uint8_t>& binary_request);
 
+    OHTTP_EXPORT std::string get_body_from_binary_response(const std::vector<uint8_t>& binary_response);
+
     OHTTP_EXPORT std::vector<uint8_t> get_encapsulated_request(OHTTP_HPKE_CTX* sender_context, const std::string& method, const std::string& scheme, const std::string& host, const std::string& path, const std::string& body, uint8_t* client_enc, size_t* client_enc_len, uint8_t* pkR, size_t pkR_len);
 
     OHTTP_EXPORT std::vector<uint8_t> encapsulate_response(OHTTP_HPKE_CTX* reciever_context, uint8_t* enc, size_t enc_len, const int response_code, const std::string& response_body);

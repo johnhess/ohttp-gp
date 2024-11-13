@@ -386,6 +386,16 @@ TEST(OhttpTest, EncapsulateAndDecapsulateRequest) {
   EXPECT_EQ(request_bhttp_vec, expected_bhttp);
 }
 
+// Enc/Decapsulate routrip test
+TEST(OhttpTest, ParseBHTTPResponse) {
+  std::string response_message = "bar";
+  std::vector<uint8_t> resp_text = std::vector<uint8_t>(response_message.begin(), response_message.end());
+  std::vector<uint8_t> response = ohttp::get_binary_response(200, resp_text);
+
+  std::string parsed_message = ohttp::get_body_from_binary_response(response);
+  EXPECT_EQ(parsed_message, response_message);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {

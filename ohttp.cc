@@ -307,6 +307,29 @@ namespace ohttp {
         return body;
     }
 
+    std::string get_body_from_binary_response(const std::vector<uint8_t>& binary_response) {
+        // Known-Length Response {
+        //   Framing Indicator (i) = 1,
+        //   Known-Length Informational Response (..) ...,
+        //   Final Response Control Data (..),
+        //   Known-Length Field Section (..),
+        //   Known-Length Content (..),
+        //   Known-Length Field Section (..),
+        //   Padding (..),
+        // }
+        int offset = 0;
+        offset += 1; // Skip framing indicator
+        // Assume no informational responses.
+        offset += 1; // Skip final response control data, assuming it's 1 byte.
+        offset += 1 + binary_response[offset]; // Skip field section
+        std::string body;
+        size_t body_length = binary_response[offset];
+        for (size_t i = 1; i <= body_length; i++) {
+            body.push_back(static_cast<char>(binary_response[offset + i]));
+        }
+        return body;
+    }
+
     // TODO: Support configurable relay/gateway/keys.
     std::vector<uint8_t> get_encapsulated_request(
       OHTTP_HPKE_CTX* sender_context,
