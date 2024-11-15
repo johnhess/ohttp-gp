@@ -4,8 +4,8 @@ This library implements Oblivious HTTP operations as used in clients and gateway
 
 You can use this library in your own implementations.  But if you just want to use OHTTP, you can find `ohttp-gp` already packaged into a client or gateway.  We've integrated it into:
 
-    * A [Greatfire Envoy](https://github.com/greatfire/envoy)-based [client](https://github.com/johnhess/cog)
-    * A [gateway](https://github.com/johnhess/gog) application that can run on your target resource server or standing alone.  The gateway handles decapsulation and re-encapsulation and also serves the specified Key Configuration so clients can self-configure.
+* A [Greatfire Envoy](https://github.com/greatfire/envoy)-based [client](https://github.com/johnhess/cog)
+* A [gateway](https://github.com/johnhess/gog) application that can run on your target resource server or standing alone.  The gateway handles decapsulation and re-encapsulation and also serves the specified Key Configuration so clients can self-configure.
 
 Instructions for configuring and deploying each are in the respective repositories.
 
