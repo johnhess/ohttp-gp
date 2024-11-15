@@ -9,7 +9,7 @@ You can use this library in your own implementations.  But if you just want to u
 
 Instructions for configuring and deploying each are in the respective repositories.
 
-We also provide a [relay](https://github.com/johnhess/pog), but that relay doesn't need this library.  You can combine all three to run an end-to-end test.
+We also provide a [relay](https://github.com/johnhess/pog), but that relay doesn't need this library.  You can combine all three to run OHTTP end-to-end.
 
 ## Relationship to Envoy
 
