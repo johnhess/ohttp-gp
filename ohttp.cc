@@ -799,7 +799,7 @@ namespace ohttp {
       if (rv2 != 1) {
           unsigned long err = ERR_get_error();
           char err_buf[256];
-          ERR_error_string_long(err, err_buf);
+          ERR_error_string(err, err_buf);
           std::cout << "Setup error: " << err_buf << std::endl;
           return DecapsulationErrorCode::ERR_NO_CONTEXT_CREATED;
       }
