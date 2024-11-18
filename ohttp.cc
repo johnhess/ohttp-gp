@@ -725,6 +725,21 @@ namespace ohttp {
         ad.push_back(erequest[i]);
       }
 
+      // First byte is Key Identifier
+      std::cout << "Key ID: 0x" << std::hex << (int)erequest[0] << std::endl;
+
+      // Next two bytes are KEM ID
+      uint16_t kem_id = (erequest[1] << 8) | erequest[2];
+      std::cout << "KEM ID: 0x" << std::hex << kem_id << std::endl;
+
+      // Next two bytes are KDF ID
+      uint16_t kdf_id = (erequest[3] << 8) | erequest[4];
+      std::cout << "KDF ID: 0x" << std::hex << kdf_id << std::endl;
+
+      // Next two bytes are AEAD ID
+      uint16_t aead_id = (erequest[5] << 8) | erequest[6];
+      std::cout << "AEAD ID: 0x" << std::hex << aead_id << std::endl;
+
       std::cout << "AAD: ";
       for (size_t i = 0; i < ad.size(); i++) {
         std::cout << std::hex << int(ad[i]) << " ";
@@ -805,8 +820,8 @@ namespace ohttp {
       }
 
       // After successful setup, print the context details
-      size_t max_overhead = EVP_HPKE_CTX_max_overhead(receiver_context->internal_ctx);
-      std::cout << "HPKE context created successfully, max overhead: " << max_overhead << std::endl;
+      // size_t max_overhead = EVP_HPKE_CTX_max_overhead(receiver_context->internal_ctx);
+      // std::cout << "HPKE context created successfully, max overhead: " << max_overhead << std::endl;
 
       int rv3 = EVP_HPKE_CTX_open(
         /* *ctx */ receiver_context->internal_ctx,
