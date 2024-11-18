@@ -101,7 +101,6 @@ namespace ohttp {
             config.clear();
             return config;
         }
-        std::cout << "Public key length: " << public_key_len << std::endl;
         config.insert(config.end(), public_key, public_key + public_key_len);
 
         // Symmetric Algorithms Length
@@ -711,6 +710,10 @@ namespace ohttp {
       // ciphertext.
 
       // The first 7 bytes of the encapsulated request are the aad.
+      //   Key Identifier (8),
+      //   HPKE KEM ID (16),
+      //   HPKE KDF ID (16),
+      //   HPKE AEAD ID (16),
       if (erequest.size() < 7) {
         return DecapsulationErrorCode::ERR_NO_ENCAPSULATED_HEADER;
       }
@@ -719,7 +722,17 @@ namespace ohttp {
         ad.push_back(erequest[i]);
       }
 
+      std::cout << "AAD: ";
+      for (size_t i = 0; i < ad.size(); i++) {
+        std::cout << std::hex << int(ad[i]) << " ";
+      }
+      std::cout << std::endl;
+
       // The next 32 bytes are the ephemeral public key.
+      // Encapsulated KEM Shared Secret (8 * Nenc)
+      // Per Section 4 HPKE:
+      //   Value  KEM                         Nsecret Nenc
+      //   0x0020 DHKEM(X25519, HKDF-SHA256)  32      32
       if (erequest.size() < 39) {
         return DecapsulationErrorCode::ERR_NO_PUBLIC_KEY;
       }
@@ -727,6 +740,12 @@ namespace ohttp {
       for (size_t i = 7; i < 39; i++) {
         enc[i - 7] = erequest[i];
       }
+
+      std::cout << "Encrypted key: ";
+      for (size_t i = 0; i < enc_len; i++) {
+        std::cout << std::hex << int(enc[i]) << " ";
+      }
+      std::cout << std::endl;
 
       // The rest is the ciphertext.
       std::vector<uint8_t> ct;
@@ -745,10 +764,16 @@ namespace ohttp {
       }
       info.push_back(0);  // Zero byte
       // Header
-      info.push_back(0x80); // Key ID
+      info.push_back(0x80); // Key ID <-- This is sus.
       info.push_back(0x00); info.push_back(0x20); // HPKE KEM ID
       info.push_back(0x00); info.push_back(0x01); // KDF ID
       info.push_back(0x00); info.push_back(0x01); // AEAD ID
+
+      std::cout << "Info: ";
+      for (size_t i = 0; i < info.size(); i++) {
+        std::cout << std::hex << int(info[i]) << " ";
+      }
+      std::cout << std::endl;
       
       int rv2 = EVP_HPKE_CTX_setup_recipient(
         /* *ctx */ receiver_context->internal_ctx,
