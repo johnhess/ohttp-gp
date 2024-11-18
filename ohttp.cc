@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <vector>
 #include <iostream>
 #include <stdexcept>
@@ -798,6 +799,22 @@ namespace ohttp {
       std::cout << "Info: ";
       for (size_t i = 0; i < info.size(); i++) {
         std::cout << std::hex << int(info[i]) << " ";
+      }
+      std::cout << std::endl;// Before EVP_HPKE_CTX_setup_recipient:
+      
+      uint8_t public_key[EVP_HPKE_MAX_PUBLIC_KEY_LENGTH];
+      size_t public_key_len;
+      if (!EVP_HPKE_KEY_public_key(
+          recipient_keypair->internal_key, 
+          public_key, 
+          &public_key_len,
+          sizeof(public_key))) {
+          std::cout << "Failed to get public key" << std::endl;
+          return DecapsulationErrorCode::ERR_NO_CONTEXT_CREATED;
+      }
+      std::cout << "Recipient public key used for setup: ";
+      for(size_t i = 0; i < public_key_len; i++) {
+          std::cout << std::hex << std::setfill('0') << std::setw(2) << (int)public_key[i] << " ";
       }
       std::cout << std::endl;
       
