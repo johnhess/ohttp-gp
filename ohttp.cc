@@ -839,7 +839,7 @@ namespace ohttp {
       // After successful setup, print the context details
       // size_t max_overhead = EVP_HPKE_CTX_max_overhead(receiver_context->internal_ctx);
       // std::cout << "HPKE context created successfully, max overhead: " << max_overhead << std::endl;
-
+      std::cout << "CT Size: " << ct.size() << std::endl;
       int rv3 = EVP_HPKE_CTX_open(
         /* *ctx */ receiver_context->internal_ctx,
         /* *out */ drequest,
