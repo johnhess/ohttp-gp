@@ -706,6 +706,9 @@ namespace ohttp {
         size_t max_drequest_len,
         OHTTP_HPKE_KEY* recipient_keypair) {
 
+          std::cout << "erequest size: " << erequest.size() << std::endl;
+          std::cout << "enc_len: " << enc_len << std::endl;
+
       // Break the request into 3 parts: AAD, ephemeral public key, and 
       // ciphertext.
 
@@ -753,6 +756,12 @@ namespace ohttp {
         ct.push_back(erequest[i]);
       }
 
+      std::cout << "HPKE-Protected Request: ";
+      for (size_t i = 0; i < ct.size(); i++) {
+        std::cout << std::hex << int(ct[i]) << " ";
+      }
+      std::cout << std::endl;
+
       // Info
       // Build a sequence of bytes (info) by concatenating the ASCII-encoded
       // string "message/bhttp request", a zero byte, and the header.
@@ -768,6 +777,7 @@ namespace ohttp {
         info.push_back(ad[i]);
       }
 
+      // 29 bytes, 58 chars.  29 = 21 + 7 + 1
       // 6d6573736167652f626874747020726571756573740000002000010001
       // in toyclient, at server, and in our ohttp_test.cc
       std::cout << "Info: ";
