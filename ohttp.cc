@@ -707,7 +707,7 @@ namespace ohttp {
         OHTTP_HPKE_KEY* recipient_keypair) {
 
           std::cout << "erequest size: " << erequest.size() << std::endl;
-          std::cout << "enc_len: " << enc_len << std::endl;
+          std::cout << "enc_len: " << std::dec << enc_len << std::endl;
 
       // Break the request into 3 parts: AAD, ephemeral public key, and 
       // ciphertext.
@@ -814,6 +814,10 @@ namespace ohttp {
         /*  ad_len */ ad.size()
       );
       if (rv3 != 1) {
+        unsigned long err = ERR_get_error();
+        char err_buf[256];
+        ERR_error_string(err, err_buf);
+        std::cout << "BoringSSL error: " << err_buf << std::endl;
         return DecapsulationErrorCode::ERR_UNABLE_TO_OPEN;
       }
 
