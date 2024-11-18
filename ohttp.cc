@@ -84,6 +84,8 @@ namespace ohttp {
         std::vector<uint8_t> config;
 
         // Key Identifier is always 0
+        // Evidently not?  Our client assumes it's 80.
+        // And apparently we do too, when we decrypt.
         config.push_back(0);
 
         // KEM_ID
@@ -366,7 +368,7 @@ namespace ohttp {
         }
         info.push_back(0);  // Zero byte
         // Header
-        info.push_back(0x00); // Key ID
+        info.push_back(0x80); // Key ID
         info.push_back(0x00); info.push_back(0x20); // HPKE KEM ID
         info.push_back(0x00); info.push_back(0x01); // KDF ID
         info.push_back(0x00); info.push_back(0x01); // AEAD ID
@@ -397,7 +399,7 @@ namespace ohttp {
         std::vector<uint8_t> ciphertext(ct_max_len);
         size_t ciphertext_len;
         std::vector<uint8_t> aad = {
-            0x00, // Key ID
+            0x80, // Key ID
             0x00, 0x20, // HPKE KEM ID
             0x00, 0x01, // KDF ID
             0x00, 0x01, // AEAD ID
@@ -839,7 +841,10 @@ namespace ohttp {
       // After successful setup, print the context details
       // size_t max_overhead = EVP_HPKE_CTX_max_overhead(receiver_context->internal_ctx);
       // std::cout << "HPKE context created successfully, max overhead: " << max_overhead << std::endl;
-      std::cout << "CT Size: " << ct.size() << std::endl;
+      std::cout << "Opening with:" << std::endl;
+      std::cout << "  ct_len: " << ct.size() << std::endl;
+      std::cout << "  ad_len: " << ad.size() << std::endl;
+      std::cout << "  max_out_len: " << max_drequest_len << std::endl;
       int rv3 = EVP_HPKE_CTX_open(
         /* *ctx */ receiver_context->internal_ctx,
         /* *out */ drequest,
