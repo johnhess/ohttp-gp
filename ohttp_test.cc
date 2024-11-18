@@ -292,12 +292,12 @@ TEST(OhttpTest, TestEncapsulatedRequestHeader) {
   std::vector<uint8_t> request =
       ohttp::get_encapsulated_request(
         sender_context, 
-        "POST", "https", "ohttp-gateway.jthess.com", "/", "foo",
+        "POST", "https", "jthess.com", "/", "foo",
         client_enc, &client_enc_len,
         pkR, pkR_len);
 
   std::vector<uint8_t> expected_hdr = {
-      0x80,        // Key ID
+      0x00,        // Key ID
       0x00, 0x20,  // HPKE KEM ID
       0x00, 0x01,  // KDF ID
       0x00, 0x01,  // AEAD ID
@@ -309,6 +309,10 @@ TEST(OhttpTest, TestEncapsulatedRequestHeader) {
   std::copy(request.begin() + 0, request.begin() + hdr_length,
             actual_hdr.begin());
   EXPECT_EQ(expected_hdr, actual_hdr);
+
+  // Enc len assumed at 32. Calculate CT len and print
+  size_t ct_len = request.size() - hdr_length - 32;
+  std::cout << "CT length for POST foo to jthess.com: " << std::dec << ct_len << std::endl;
 
   // enc and ct vary.  Their creation is outsourced to HPKE implementation from
   // openssl.
