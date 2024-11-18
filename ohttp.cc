@@ -764,10 +764,10 @@ namespace ohttp {
       }
       info.push_back(0);  // Zero byte
       // Header
-      info.push_back(0x80); // Key ID <-- This is sus.
-      info.push_back(0x00); info.push_back(0x20); // HPKE KEM ID
-      info.push_back(0x00); info.push_back(0x01); // KDF ID
-      info.push_back(0x00); info.push_back(0x01); // AEAD ID
+      // Push ad back
+      for (size_t i = 0; i < ad.size(); i++) {
+        info.push_back(ad[i]);
+      }
 
       std::cout << "Info: ";
       for (size_t i = 0; i < info.size(); i++) {
