@@ -86,7 +86,7 @@ namespace ohttp {
         // Key Identifier is always 0
         // Evidently not?  Our client assumes it's 80.
         // And apparently we do too, when we decrypt.
-        config.push_back(80);
+        config.push_back(0x80);
 
         // KEM_ID
         const EVP_HPKE_KEM *kem = EVP_HPKE_KEY_kem(keypair->internal_key);
