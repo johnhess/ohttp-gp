@@ -297,7 +297,7 @@ TEST(OhttpTest, TestEncapsulatedRequestHeader) {
         pkR, pkR_len);
 
   std::vector<uint8_t> expected_hdr = {
-      0x80,        // Key ID
+      0x00,        // Key ID
       0x00, 0x20,  // HPKE KEM ID
       0x00, 0x01,  // KDF ID
       0x00, 0x01,  // AEAD ID

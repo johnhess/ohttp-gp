@@ -345,14 +345,6 @@ namespace ohttp {
         // Hard coded key config matching ohttp-gateway.jthess.com's
         // public key.
 
-        // Key ID (8 bit)                 80
-        // HPKE KEM ID (16)               0020 	DHKEM(X25519, HKDF-SHA256)
-        // HPKE Public Key (8*Npk=8*32)   7a04f3070f2fc4c52c06eb373060b415dbd8e82effe4088965a2602c27b91646
-        // HPKE Symmetric Algos Len (16)  0004
-        // HPKE Symmetric algorithms (32) 
-        //   HPKE KDF ID                  0001 // HKDF-SHA256	
-        //   HPKE AEAD ID                 0001 // AES-128-GCM	
-
         // Plaintext:
         std::vector<uint8_t> binary_request = get_binary_request(method, scheme, host, path, body);
 
@@ -366,7 +358,7 @@ namespace ohttp {
         }
         info.push_back(0);  // Zero byte
         // Header
-        info.push_back(0x80); // Key ID
+        info.push_back(0x00); // Key ID
         info.push_back(0x00); info.push_back(0x20); // HPKE KEM ID
         info.push_back(0x00); info.push_back(0x01); // KDF ID
         info.push_back(0x00); info.push_back(0x01); // AEAD ID
@@ -411,7 +403,7 @@ namespace ohttp {
         // Per RFC 9292, the encapsulated request is the concatenation of the
         // hdr, enc, and ciphertext.
         std::vector<uint8_t> hdr = {
-            0x80, // Key ID
+            0x00, // Key ID
             0x00, 0x20, // HPKE KEM ID
             0x00, 0x01, // KDF ID
             0x00, 0x01, // AEAD ID
@@ -717,7 +709,6 @@ namespace ohttp {
       for (size_t i = 0; i < 7; i++) {
         hdr.push_back(erequest[i]);
       }
-      // TODO: Use header to select proper decryption key
 
       // The next 32 bytes are the ephemeral public key.
       if (erequest.size() < 39) {
@@ -745,7 +736,8 @@ namespace ohttp {
       }
       info.push_back(0);  // Zero byte
       // Header
-      info.push_back(0x80); // Key ID
+      info.push_back(hdr[0]); // Key ID from header
+      // TODO: Use header to select algorithm.
       info.push_back(0x00); info.push_back(0x20); // HPKE KEM ID
       info.push_back(0x00); info.push_back(0x01); // KDF ID
       info.push_back(0x00); info.push_back(0x01); // AEAD ID
