@@ -247,14 +247,92 @@ namespace ohttp {
         return binary_request;
     }
 
+    std::vector<uint8_t> get_quic_integer_as_bytes(uint64_t in) {
+        std::vector<uint8_t> encoded;
+
+        if (in <= 63ULL) {
+            encoded.push_back(static_cast<uint8_t>(in | 0b00'000000));
+        } else if (in <= 16383ULL) {
+            encoded.push_back(static_cast<uint8_t>((in >> 8) | 0b01'000000));
+            encoded.push_back(static_cast<uint8_t>(in & 0xFF));
+        } else if (in <= 1073741823ULL) {
+            encoded.push_back(static_cast<uint8_t>((in >> 24) | 0b10'000000));
+            encoded.push_back(static_cast<uint8_t>((in >> 16) & 0xFF));
+            encoded.push_back(static_cast<uint8_t>((in >> 8) & 0xFF));
+            encoded.push_back(static_cast<uint8_t>(in & 0xFF));
+        } else if (in <= 4611686018427387903ULL) {
+            encoded.push_back(static_cast<uint8_t>(((in >> 56) & 0b00111111) | 0b11'000000));
+            encoded.push_back(static_cast<uint8_t>((in >> 48) & 0xFF));
+            encoded.push_back(static_cast<uint8_t>((in >> 40) & 0xFF));
+            encoded.push_back(static_cast<uint8_t>((in >> 32) & 0xFF));
+            encoded.push_back(static_cast<uint8_t>((in >> 24) & 0xFF));
+            encoded.push_back(static_cast<uint8_t>((in >> 16) & 0xFF));
+            encoded.push_back(static_cast<uint8_t>((in >> 8) & 0xFF));
+            encoded.push_back(static_cast<uint8_t>(in & 0xFF));
+        }
+        return encoded;
+    }
+
+    uint64_t get_quic_integer_from_bytes(const std::vector<uint8_t>& in) {
+        if (in.size() == 0) {
+            return -1;
+        }
+        uint64_t result = 0;
+        if ((in[0] & 0b11'000000) == 0b00'000000) {
+            result = in[0] & 0b00'111111;
+        } else if ((in[0] & 0b11'000000) == 0b01'000000) {
+            result = (in[0] & 0b00'111111) << 8;
+            result |= in[1];
+        } else if ((in[0] & 0b11'000000) == 0b10'000000) {
+            result = (in[0] & 0b00'111111) << 24;
+            result |= in[1] << 16;
+            result |= in[2] << 8;
+            result |= in[3];
+        } else if ((in[0] & 0b11'000000) == 0b11'000000) {
+            result = static_cast<uint64_t>(in[0] & 0b00'111111) << 56;
+            result |= static_cast<uint64_t>(in[1]) << 48;
+            result |= static_cast<uint64_t>(in[2]) << 40;
+            result |= static_cast<uint64_t>(in[3]) << 32;
+            result |= static_cast<uint64_t>(in[4]) << 24;
+            result |= static_cast<uint64_t>(in[5]) << 16;
+            result |= static_cast<uint64_t>(in[6]) << 8;
+            result |= static_cast<uint64_t>(in[7]);
+        } else {
+          return -1;
+        }
+        return result;
+    }
+
     std::vector<uint8_t> get_binary_response(const int response_code, const std::vector<uint8_t>& content) {
+      // Known-Length Response {
       std::vector<uint8_t> binary_response;
+      //   Framing Indicator (i) = 1,
       binary_response.push_back(1); // Known-Length Informational Response
-      binary_response.push_back(response_code); // Status Code      
-      binary_response.push_back(0); // Known-Length Field Section Length
-      binary_response.push_back(content.size()); // Content Length
+      //   Known-Length Informational Response (..) ...,
+      //   Final Response Control Data {
+      //     Status Code (i) = 200..599,
+      std::vector<uint8_t> response_code_bytes = get_quic_integer_as_bytes(uint64_t(response_code));
+      binary_response.insert(binary_response.end(), response_code_bytes.begin(), response_code_bytes.end());   
+      //   }
+      //   Known-Length Field Section {
+      binary_response.push_back(0);
+      //     Length (i),
+      //     Field Line (..) ...,
+      //   }
+      //   Known-Length Content {
+      //     Content Length (i),
+      std::vector<uint8_t> content_size_bytes = get_quic_integer_as_bytes(uint64_t(content.size()));
+      binary_response.insert(binary_response.end(), content_size_bytes.begin(), content_size_bytes.end());
+      //     Content (..),
       binary_response.insert(binary_response.end(), content.begin(), content.end());
-      binary_response.push_back(0); // Trailer section length
+      //   }
+      //   Known-Length Field Section {
+      binary_response.push_back(0);
+      //     Length (i),
+      //     Field Line (..) ...,
+      //   }
+      //   Padding (..),
+      // }
       return binary_response;
     }
 

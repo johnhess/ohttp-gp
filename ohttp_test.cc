@@ -154,7 +154,7 @@ TEST(OhttpTest, TestBinaryResponse) {
     // Final Response Control Data {
     //   Status Code (i) = 200..599,
     // }
-    200,
+    0b01000000, 0b11001000,
 
     // Known-Length Field Section {
     //   Length (i),
@@ -394,6 +394,37 @@ TEST(OhttpTest, ParseBHTTPResponse) {
 
   std::string parsed_message = ohttp::get_body_from_binary_response(response);
   EXPECT_EQ(parsed_message, response_message);
+}
+
+TEST(OhttpTest, QuicEncodingRoundtrip) {
+  std::vector<uint64_t> values = {
+    0, 
+    1, 
+    16383ULL,
+    16384ULL,
+    1073741823ULL, 
+    1073741824ULL,
+    4611686018427387903ULL, // QUIC max
+  };
+  for (size_t i = 0; i < values.size(); i++) {
+    std::vector<uint8_t> encoded = ohttp::get_quic_integer_as_bytes(values[i]);
+    uint64_t decoded = ohttp::get_quic_integer_from_bytes(encoded);
+    EXPECT_EQ(decoded, values[i]);
+  }
+}
+
+TEST(OhttpTest, QuicEncoding1) {
+  uint8_t expected = 0b00000001;
+  std::vector<uint8_t> encoded = ohttp::get_quic_integer_as_bytes(1);
+  EXPECT_EQ(encoded.size(), size_t(1));
+  EXPECT_EQ(encoded[0], expected);
+}
+
+TEST(OhttpTest, QuicEncodingMax) {
+  std::vector<uint8_t> expected = std::vector<uint8_t>(8, 0b11111111);
+  std::vector<uint8_t> encoded = ohttp::get_quic_integer_as_bytes(4611686018427387903ULL);
+  EXPECT_EQ(encoded.size(), size_t(8));
+  EXPECT_EQ(encoded, expected);
 }
 
 }  // namespace

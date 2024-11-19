@@ -107,6 +107,9 @@ namespace ohttp {
     OHTTP_EXPORT DecapsulationErrorCode decapsulate_request(OHTTP_HPKE_CTX* receiver_context, std::vector<uint8_t> erequest, uint8_t* drequest, size_t* drequest_len, uint8_t* enc, size_t enc_len, size_t max_drequest_len, OHTTP_HPKE_KEY* recipient_keypair);
     
     OHTTP_EXPORT DecapsulationErrorCode decapsulate_response(OHTTP_HPKE_CTX* sender_context, uint8_t* enc, size_t enc_len, std::vector<uint8_t> eresponse, uint8_t* dresponse, size_t* dresponse_len, size_t max_drequest_len);
+    std::vector<uint8_t> get_quic_integer_as_bytes(uint64_t in);
+
+    uint64_t get_quic_integer_from_bytes(const std::vector<uint8_t>& in);
 
 } // namespace ohttp
 
