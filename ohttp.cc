@@ -405,7 +405,7 @@ namespace ohttp {
         consumable_resp.erase(consumable_resp.begin());
         // Assume no informational responses.
         // Get response code
-        uint64_t response_code = get_quic_integer_from_bytes(consumable_resp);
+        (void)get_quic_integer_from_bytes(consumable_resp);
         // Skip field section
         uint64_t field_section_length = get_quic_integer_from_bytes(consumable_resp);
         consumable_resp.erase(consumable_resp.begin(), consumable_resp.begin() + field_section_length);
