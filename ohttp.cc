@@ -371,9 +371,6 @@ namespace ohttp {
         info.push_back(0x00); info.push_back(0x01); // KDF ID
         info.push_back(0x00); info.push_back(0x01); // AEAD ID
 
-        // Ciphertext & Friends:
-        std::vector<uint8_t> encapsulated_request;  // will be aad + enc + ct
-
         int rv = EVP_HPKE_CTX_setup_sender(
             /* *ctx */ sender_context->internal_ctx,
             /* *out_enc */ client_enc,
@@ -396,12 +393,7 @@ namespace ohttp {
             EVP_HPKE_CTX_max_overhead(sender_context->internal_ctx);
         std::vector<uint8_t> ciphertext(ct_max_len);
         size_t ciphertext_len;
-        std::vector<uint8_t> aad = {
-            0x80, // Key ID
-            0x00, 0x20, // HPKE KEM ID
-            0x00, 0x01, // KDF ID
-            0x00, 0x01, // AEAD ID
-        };
+        std::vector<uint8_t> ad = {};
         rv = EVP_HPKE_CTX_seal(
             /* *ctx */ sender_context->internal_ctx,
             /* *out */ ciphertext.data(),
@@ -409,16 +401,23 @@ namespace ohttp {
             /*  max_out_len */ ciphertext.size(),
             /* *in */ binary_request.data(),
             /*  in_len */ binary_request.size(),
-            /* *ad */ aad.data(),
-            /*  ad_len */ aad.size()
+            /* *ad */ ad.data(),
+            /*  ad_len */ ad.size()
         );
         if (rv != 1) {
             return {};
         }
 
         // Per RFC 9292, the encapsulated request is the concatenation of the
-        // aad, enc, and ciphertext.
-        encapsulated_request.insert(encapsulated_request.end(), aad.begin(), aad.end());
+        // hdr, enc, and ciphertext.
+        std::vector<uint8_t> hdr = {
+            0x80, // Key ID
+            0x00, 0x20, // HPKE KEM ID
+            0x00, 0x01, // KDF ID
+            0x00, 0x01, // AEAD ID
+        };
+        std::vector<uint8_t> encapsulated_request;
+        encapsulated_request.insert(encapsulated_request.end(), hdr.begin(), hdr.end());
         encapsulated_request.insert(encapsulated_request.end(), client_enc, client_enc + *client_enc_len);
         encapsulated_request.insert(encapsulated_request.end(), ciphertext.begin(), ciphertext.begin() + ciphertext_len);
 
@@ -707,17 +706,18 @@ namespace ohttp {
         size_t max_drequest_len,
         OHTTP_HPKE_KEY* recipient_keypair) {
 
-      // Break the request into 3 parts: AAD, ephemeral public key, and 
+      // Break the request into 3 parts: hdr, ephemeral public key, and 
       // ciphertext.
 
-      // The first 7 bytes of the encapsulated request are the aad.
+      // The first 7 bytes of the encapsulated request are the hdr.
       if (erequest.size() < 7) {
         return DecapsulationErrorCode::ERR_NO_ENCAPSULATED_HEADER;
       }
-      std::vector<uint8_t> ad;
+      std::vector<uint8_t> hdr;
       for (size_t i = 0; i < 7; i++) {
-        ad.push_back(erequest[i]);
+        hdr.push_back(erequest[i]);
       }
+      // TODO: Use header to select proper decryption key
 
       // The next 32 bytes are the ephemeral public key.
       if (erequest.size() < 39) {
@@ -764,6 +764,7 @@ namespace ohttp {
         return DecapsulationErrorCode::ERR_NO_CONTEXT_CREATED;
       }
 
+      std::vector<uint8_t> ad = {};
       int rv3 = EVP_HPKE_CTX_open(
         /* *ctx */ receiver_context->internal_ctx,
         /* *out */ drequest,
