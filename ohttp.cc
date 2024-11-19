@@ -842,9 +842,20 @@ namespace ohttp {
       // size_t max_overhead = EVP_HPKE_CTX_max_overhead(receiver_context->internal_ctx);
       // std::cout << "HPKE context created successfully, max overhead: " << max_overhead << std::endl;
       std::cout << "Opening with:" << std::endl;
-      std::cout << "  ct_len: " << ct.size() << std::endl;
-      std::cout << "  ad_len: " << ad.size() << std::endl;
-      std::cout << "  max_out_len: " << max_drequest_len << std::endl;
+      std::cout << "  ct_len: " << std::dec << ct.size() << std::endl;
+      std::cout << "  ad_len: " << std::dec << ad.size() << std::endl;
+      std::cout << "  max_out_len: " << std::dec << max_drequest_len << std::endl;
+      std::cout << "  ct: ";
+      for (size_t i = 0; i < ct.size(); i++) {
+        std::cout << std::hex << int(ct[i]) << " ";
+      }
+      std::cout << std::endl;
+      std::cout << "Encapsulated KEM Shared Secret: ";
+      for (size_t i = 0; i < enc_len; i++) {
+        std::cout << std::hex << int(enc[i]) << " ";
+      }
+      std::cout << std::endl;
+
       int rv3 = EVP_HPKE_CTX_open(
         /* *ctx */ receiver_context->internal_ctx,
         /* *out */ drequest,
