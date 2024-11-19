@@ -273,22 +273,25 @@ namespace ohttp {
         return encoded;
     }
 
-    uint64_t get_quic_integer_from_bytes(const std::vector<uint8_t>& in) {
+    uint64_t get_quic_integer_from_bytes(std::vector<uint8_t>& in) {
         if (in.size() == 0) {
             return -1;
         }
         uint64_t result = 0;
-        if ((in[0] & 0b11'000000) == 0b00'000000) {
+        if (in.size() >= 1 && (in[0] & 0b11'000000) == 0b00'000000) {
             result = in[0] & 0b00'111111;
-        } else if ((in[0] & 0b11'000000) == 0b01'000000) {
+            in.erase(in.begin());
+        } else if (in.size() >= 2 && (in[0] & 0b11'000000) == 0b01'000000) {
             result = (in[0] & 0b00'111111) << 8;
             result |= in[1];
-        } else if ((in[0] & 0b11'000000) == 0b10'000000) {
+            in.erase(in.begin(), in.begin() + 2);
+        } else if (in.size() >= 4 && (in[0] & 0b11'000000) == 0b10'000000) {
             result = (in[0] & 0b00'111111) << 24;
             result |= in[1] << 16;
             result |= in[2] << 8;
             result |= in[3];
-        } else if ((in[0] & 0b11'000000) == 0b11'000000) {
+            in.erase(in.begin(), in.begin() + 4);
+        } else if (in.size() >= 8 && (in[0] & 0b11'000000) == 0b11'000000) {
             result = static_cast<uint64_t>(in[0] & 0b00'111111) << 56;
             result |= static_cast<uint64_t>(in[1]) << 48;
             result |= static_cast<uint64_t>(in[2]) << 40;
@@ -297,6 +300,7 @@ namespace ohttp {
             result |= static_cast<uint64_t>(in[5]) << 16;
             result |= static_cast<uint64_t>(in[6]) << 8;
             result |= static_cast<uint64_t>(in[7]);
+            in.erase(in.begin(), in.begin() + 8);
         } else {
           return -1;
         }

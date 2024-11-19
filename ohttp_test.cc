@@ -408,8 +408,10 @@ TEST(OhttpTest, QuicEncodingRoundtrip) {
   };
   for (size_t i = 0; i < values.size(); i++) {
     std::vector<uint8_t> encoded = ohttp::get_quic_integer_as_bytes(values[i]);
+    EXPECT_GT(encoded.size(), 0);
     uint64_t decoded = ohttp::get_quic_integer_from_bytes(encoded);
     EXPECT_EQ(decoded, values[i]);
+    EXPECT_EQ(encoded.size(), 0);  // All bytes should be consumed.
   }
 }
 
