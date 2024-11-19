@@ -3,6 +3,7 @@
 #include "gtest/gtest.h"
 
 #include "ohttp.h"
+#include "ohttp_internal.h"
 
 namespace {
 
@@ -240,9 +241,10 @@ TEST(OhttpTest, EncapsulateAndDecapsulateResponse) {
     max_resp_out_len);
   EXPECT_EQ(rv3, ohttp::DecapsulationErrorCode::SUCCESS);
 
-  EXPECT_EQ(resp_out_len, size_t(23)); // 18 plus the BHTTP encoding
+  EXPECT_EQ(resp_out_len, size_t(24)); // 18 + 1 frame indicator + 2 status code + 1 content length
   EXPECT_EQ(response_bhttp[0], 1);     // Fixed length response
-  EXPECT_EQ(response_bhttp[1], 200);   // Status code (Improperly encoded.  Fix this.)
+  EXPECT_EQ(response_bhttp[1], 0b01000000);
+  EXPECT_EQ(response_bhttp[2], 200);
 }
 
 TEST(OhttpTest, ParseBinaryRequest)

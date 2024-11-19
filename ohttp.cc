@@ -399,15 +399,21 @@ namespace ohttp {
         //   Known-Length Field Section (..),
         //   Padding (..),
         // }
-        int offset = 0;
-        offset += 1; // Skip framing indicator
+        std::vector<uint8_t> consumable_resp(binary_response.size());
+        std::copy(binary_response.begin(), binary_response.end(), consumable_resp.begin());
+        // Skip framing indicator
+        consumable_resp.erase(consumable_resp.begin());
         // Assume no informational responses.
-        offset += 1; // Skip final response control data, assuming it's 1 byte.
-        offset += 1 + binary_response[offset]; // Skip field section
+        // Get response code
+        uint64_t response_code = get_quic_integer_from_bytes(consumable_resp);
+        // Skip field section
+        uint64_t field_section_length = get_quic_integer_from_bytes(consumable_resp);
+        consumable_resp.erase(consumable_resp.begin(), consumable_resp.begin() + field_section_length);
+        // Get content
+        uint64_t content_length = get_quic_integer_from_bytes(consumable_resp);
         std::string body;
-        size_t body_length = binary_response[offset];
-        for (size_t i = 1; i <= body_length; i++) {
-            body.push_back(static_cast<char>(binary_response[offset + i]));
+        for (size_t i = 0; i < content_length; i++) {
+            body.push_back(static_cast<char>(consumable_resp[i]));
         }
         return body;
     }
