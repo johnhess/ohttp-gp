@@ -86,7 +86,7 @@ namespace ohttp {
         // Key Identifier is always 0
         // Evidently not?  Our client assumes it's 80.
         // And apparently we do too, when we decrypt.
-        config.push_back(0);
+        config.push_back(80);
 
         // KEM_ID
         const EVP_HPKE_KEM *kem = EVP_HPKE_KEY_kem(keypair->internal_key);
@@ -347,7 +347,7 @@ namespace ohttp {
         // Hard coded key config matching ohttp-gateway.jthess.com's
         // public key.
 
-        // Key ID (8 bit)                 00
+        // Key ID (8 bit)                 80
         // HPKE KEM ID (16)               0020 	DHKEM(X25519, HKDF-SHA256)
         // HPKE Public Key (8*Npk=8*32)   7a04f3070f2fc4c52c06eb373060b415dbd8e82effe4088965a2602c27b91646
         // HPKE Symmetric Algos Len (16)  0004
